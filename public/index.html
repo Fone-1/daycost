@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>日均成本计算器 (DayCost)</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="user-status" id="userStatus" style="display: none;">
+        <span>欢迎，<span id="displayUsername">User</span></span>
+        <button id="changePwdBtn" class="btn-small">改密</button>
+        <button id="logoutBtn" class="btn-small">退出</button>
+    </div>
+
+    <!-- Global Stats Overlay (Top Left) -->
+    <div id="globalStatsBox" class="hidden" style="position: absolute; top: 20px; left: 20px; padding: 10px 18px; background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 20px; backdrop-filter: blur(10px); display: flex; align-items: center; gap: 15px;">
+        <div style="text-align: right;">
+            <span style="color: #94a3b8; font-size: 0.75rem; display:block; margin-bottom: 2px;">资金总投入</span>
+            <div style="font-size: 1.1rem; font-weight: 700; color: #f8fafc; line-height: 1;">￥<span id="globalTotalPrice">0.00</span></div>
+        </div>
+        <div style="width: 1px; height: 28px; background: rgba(255,255,255,0.15);"></div>
+        <div>
+            <span style="color: #94a3b8; font-size: 0.75rem; display:block; margin-bottom: 2px;">当前每日总耗</span>
+            <div style="font-size: 1.1rem; font-weight: 700; color: #10b981; line-height: 1;">￥<span id="globalTotalDaily">0.00</span><span style="font-size: 0.8rem; color: #94a3b8; font-weight: normal;"> /天</span></div>
+        </div>
+    </div>
+
+    <!-- Auth Section -->
+    <div class="container" id="authSection">
+        <header>
+            <h1>DayCost</h1>
+            <p>登录以保存并同步你的物品日均成本</p>
+        </header>
+
+        <main>
+            <div class="card glass">
+                <div class="auth-tabs">
+                    <button class="tab active" id="tabLogin">登录</button>
+                    <button class="tab" id="tabRegister">注册</button>
+                </div>
+                
+                <form id="authForm">
+                    <div id="authError" class="error-msg hidden"></div>
+                    <div class="form-group">
+                        <label for="username">用户名</label>
+                        <input type="text" id="username" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="password">密码</label>
+                        <input type="password" id="password" required>
+                    </div>
+                    <button type="submit" class="btn" id="authSubmitBtn">登录</button>
+                </form>
+            </div>
+        </main>
+    </div>
+
+    <!-- Dashboard Section -->
+    <div class="container dashboard-container hidden" id="dashboardSection">
+        <header>
+            <h1>DayCost</h1>
+            <p>计算你的物品“日均使用成本”</p>
+        </header>
+
+        <main>
+            <div class="card glass">
+                <form id="costForm">
+                    <div class="form-group">
+                        <label for="itemName">物品名称 (可选)</label>
+                        <input type="text" id="itemName" placeholder="例如：iPhone 15">
+                    </div>
+                    <div class="form-group">
+                        <label for="parentSelect">归属组合 (如: 主机)</label>
+                        <select id="parentSelect" class="sort-select" style="width: 100%;">
+                            <option value="">- 独立物品 -</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="price">花费金额 (元)</label>
+                        <input type="number" id="price" required min="0" step="0.01" placeholder="0.00">
+                    </div>
+                    <div class="form-group">
+                        <label for="purchaseDate">购买日期</label>
+                        <input type="date" id="purchaseDate" required>
+                    </div>
+                    <button type="submit" class="btn">计算日均成本</button>
+                </form>
+
+
+            </div>
+
+            <!-- History Section -->
+            <div class="history-section glass" style="display: flex; flex-direction: column;">
+                <div class="history-header">
+                    <h2>历史记录</h2>
+                    <div style="display:flex; gap:0.5rem; align-items:center;">
+                        <span style="color:#cbd5e1; font-size:0.8rem;">过滤</span>
+                        <select id="filterSelect" class="sort-select">
+                            <option value="all">全部展示</option>
+                            <option value="active">使用中</option>
+                            <option value="broken">已损坏</option>
+                            <option value="sold">已退役(回血)</option>
+                        </select>
+                        <select id="sortSelect" class="sort-select">
+                            <option value="dateDesc">最新添加</option>
+                            <option value="costDesc">日均成本从高到低</option>
+                            <option value="costAsc">日均成本从低到高</option>
+                            <option value="priceDesc">总价从高到低</option>
+                            <option value="daysDesc">使用天数长到短</option>
+                            <option value="daysAsc">使用天数短到长</option>
+                        </select>
+                    </div>
+                </div>
+                <div id="historyList" class="history-list">
+                    <!-- History items will be injected here -->
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Result Modal -->
+    <div id="resultModal" class="modal-overlay hidden">
+        <div class="modal-content glass">
+            <button class="modal-close" id="modalCloseBtn">&times;</button>
+            <h2 id="modalResultTitle">...</h2>
+            <div class="cost-display" style="margin-bottom:1.5rem;">
+                <span class="currency">¥</span>
+                <span id="modalDailyCost" class="amount">0.00</span>
+                <span class="unit">/ 天</span>
+            </div>
+            <div class="details">
+                <p>已购买: <strong id="modalDaysUsed">0</strong> 天</p>
+                <p>总价: ¥<strong id="modalTotalCost">0.00</strong></p>
+            </div>
+            <p style="margin-top: 1.5rem; color: #94a3b8; font-size: 0.85rem;">该记录已自动保存至历史列表</p>
+        </div>
+    </div>
+
+    <!-- Status Modal (Now Global Edit Modal) -->
+    <div id="statusModal" class="modal-overlay hidden">
+        <div class="modal-content glass" style="max-width: 450px;">
+            <button class="modal-close" id="statusModalCloseBtn">&times;</button>
+            <h2 style="margin-bottom:1.5rem;">修改物品信息</h2>
+            
+            <form id="statusForm" style="text-align: left;">
+                <input type="hidden" id="statusRecordId">
+                <div class="form-group" style="margin-bottom: 0.8rem;">
+                    <label>物品名称</label>
+                    <input type="text" id="statusEditName" required>
+                </div>
+                <div class="form-group" style="margin-bottom: 0.8rem;">
+                    <label for="statusEditParentId">归属组合</label>
+                    <select id="statusEditParentId" class="sort-select" style="width: 100%;">
+                        <option value="">- 独立物品 -</option>
+                    </select>
+                </div>
+                <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
+                    <div class="form-group" style="margin-bottom: 0.8rem;">
+                        <label>买入金额 (元)</label>
+                        <input type="number" id="statusEditPrice" min="0" step="0.01" required>
+                    </div>
+                    <div class="form-group" style="margin-bottom: 0.8rem;">
+                        <label>买入日期</label>
+                        <input type="date" id="statusEditDate" required>
+                    </div>
+                </div>
+                <hr style="border:0; border-top:1px solid var(--border-color); margin:1rem 0;">
+                <div class="form-group" style="margin-bottom: 0.8rem;">
+                    <label for="statusSelect">当前状态</label>
+                    <select id="statusSelect" class="sort-select" style="width: 100%;">
+                        <option value="active">🟢 使用中 (正常计费)</option>
+                        <option value="broken">🔴 已损坏 (停止计费)</option>
+                        <option value="sold">🟡 已售出 (回血停驻)</option>
+                    </select>
+                </div>
+                
+                <div id="endDateGroup" class="form-group hidden">
+                    <label id="endDateLabel" for="statusEndDate">变动日期</label>
+                    <input type="date" id="statusEndDate">
+                </div>
+                
+                <div id="resalePriceGroup" class="form-group hidden">
+                    <label for="statusResalePrice">回血金额 (元)</label>
+                    <input type="number" id="statusResalePrice" min="0" step="0.01" placeholder="0.00">
+                </div>
+                
+                <button type="submit" class="btn">保存状态</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Global Tooltip -->
+    <div id="globalTooltip" class="tooltip"></div>
+
+    <!-- Password Modal -->
+    <div id="passwordModal" class="modal-overlay hidden">
+        <div class="modal-content glass" style="max-width: 350px;">
+            <button class="modal-close" id="passwordModalCloseBtn">&times;</button>
+            <h2 style="margin-bottom:1.5rem;">修改密码</h2>
+            <form id="passwordForm" style="text-align: left;">
+                <div id="passwordError" class="error-msg hidden"></div>
+                <div class="form-group" style="margin-bottom: 0.8rem;">
+                    <label>原密码</label>
+                    <input type="password" id="oldPassword" required>
+                </div>
+                <div class="form-group" style="margin-bottom: 0.8rem;">
+                    <label>新密码</label>
+                    <input type="password" id="newPassword" required>
+                </div>
+                <div class="form-group" style="margin-bottom: 1.5rem;">
+                    <label>确认新密码</label>
+                    <input type="password" id="confirmPassword" required>
+                </div>
+                <button type="submit" class="btn">提交修改</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Custom Confirm Modal -->
+    <div id="customConfirmModal" class="modal-overlay hidden">
+        <div class="modal-content glass" style="max-width: 380px; text-align: center; padding: 2rem;">
+            <div style="font-size: 3rem; margin-bottom: 1rem;">⚠️</div>
+            <h2 id="confirmTitle" style="margin-bottom:1rem; font-size: 1.3rem;">确认删除？</h2>
+            <p id="confirmMessage" style="color: #94a3b8; font-size: 0.95rem; margin-bottom: 2rem; line-height: 1.5;"></p>
+            <div style="display: flex; gap: 1rem; justify-content: center;">
+                <button id="confirmCancelBtn" class="btn" style="background: rgba(255,255,255,0.1); color: white; flex: 1;">取消</button>
+                <button id="confirmOkBtn" class="btn" style="background: var(--danger); color: white; flex: 1;">确认删除</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
