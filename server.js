@@ -209,6 +209,81 @@ app.put('/api/records/:id', authenticateToken, (req, res) => {
     }
 });
 
+// Import Records (Restore / Append)
+app.post('/api/records/import', authenticateToken, (req, res) => {
+    const { mode, records } = req.body;
+    if (!Array.isArray(records)) {
+        return res.status(400).json({ error: '无效的数据格式' });
+    }
+
+    db.serialize(() => {
+        db.run('BEGIN TRANSACTION;');
+
+        if (mode === 'overwrite') {
+            db.run('DELETE FROM records WHERE user_id = ?', [req.user.id]);
+        }
+
+        const oldToNewMap = {};
+        const parents = records.filter(r => !r.parent_id);
+        const children = records.filter(r => r.parent_id);
+
+        const insertRecord = (r, newParentId, callback) => {
+            const sql = `
+                INSERT INTO records (user_id, item_name, price, purchase_date, status, end_date, resale_price, parent_id)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            `;
+            db.run(sql, [
+                req.user.id,
+                r.item_name || '未命名',
+                r.price || 0,
+                r.purchase_date,
+                r.status || 'active',
+                r.end_date || null,
+                r.resale_price || 0,
+                newParentId || null
+            ], function(err) {
+                if (err) return callback(err);
+                callback(null, this.lastID);
+            });
+        };
+
+        const processParents = (index, done) => {
+            if (index >= parents.length) return done();
+            const p = parents[index];
+            insertRecord(p, null, (err, newId) => {
+                if (err) {
+                    db.run('ROLLBACK;');
+                    return res.status(500).json({ error: '父组件导入失败' });
+                }
+                oldToNewMap[p.id] = newId;
+                processParents(index + 1, done);
+            });
+        };
+
+        const processChildren = (index, done) => {
+            if (index >= children.length) return done();
+            const c = children[index];
+            const mappedParentId = oldToNewMap[c.parent_id] || null;
+            insertRecord(c, mappedParentId, (err, newId) => {
+                if (err) {
+                    db.run('ROLLBACK;');
+                    return res.status(500).json({ error: '子组件导入失败' });
+                }
+                processChildren(index + 1, done);
+            });
+        };
+
+        processParents(0, () => {
+            processChildren(0, () => {
+                db.run('COMMIT;', (err) => {
+                    if (err) return res.status(500).json({ error: '提交事务失败' });
+                    res.json({ message: '导入成功' });
+                });
+            });
+        });
+    });
+});
+
 // Catch-all route for sending index.html
 app.use((req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));

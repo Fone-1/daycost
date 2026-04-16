@@ -30,7 +30,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // --- Elements ---
-    const userStatus = document.getElementById('userStatus');
     const displayUsername = document.getElementById('displayUsername');
     const changePwdBtn = document.getElementById('changePwdBtn');
     const logoutBtn = document.getElementById('logoutBtn');
@@ -105,6 +104,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const historyList = document.getElementById('historyList');
     const filterSelect = document.getElementById('filterSelect');
     const sortSelect = document.getElementById('sortSelect');
+    const searchInput = document.getElementById('searchInput');
 
     // --- State ---
     let isLoginMode = true;
@@ -114,6 +114,29 @@ document.addEventListener('DOMContentLoaded', () => {
     const todayStr = new Date().toISOString().split('T')[0];
     dateInput.max = todayStr;
     dateInput.value = todayStr;
+
+    // --- SPA Routing Logic ---
+    const navBtns = document.querySelectorAll('.nav-btn');
+    const panes = document.querySelectorAll('.spa-pane');
+
+    navBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+            const targetId = btn.getAttribute('data-target');
+            
+            navBtns.forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+
+            panes.forEach(pane => {
+                if (pane.id === targetId) {
+                    pane.classList.remove('hidden');
+                    pane.classList.add('active');
+                } else {
+                    pane.classList.remove('active');
+                    pane.classList.add('hidden');
+                }
+            });
+        });
+    });
 
     checkAuth();
 
@@ -160,13 +183,11 @@ document.addEventListener('DOMContentLoaded', () => {
         if (token && username) {
             authSection.classList.add('hidden');
             dashboardSection.classList.remove('hidden');
-            userStatus.style.display = 'flex';
             displayUsername.textContent = username;
             loadHistory();
         } else {
             authSection.classList.remove('hidden');
             dashboardSection.classList.add('hidden');
-            userStatus.style.display = 'none';
             if (globalStatsBox) globalStatsBox.classList.add('hidden');
         }
     }
@@ -465,6 +486,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     filterSelect.addEventListener('change', () => renderHistory());
     sortSelect.addEventListener('change', () => renderHistory());
+    searchInput.addEventListener('input', () => renderHistory());
 
     window.toggleChildren = function(parentId) {
         const container = document.getElementById(`children-${parentId}`);
@@ -524,6 +546,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
         let totalGlobalDailyCost = 0;
         let totalGlobalPrice = 0;
+        
+        let countActive = 0;
+        let countBroken = 0;
+        let countSold = 0;
+        let countTotal = globalRecords.length;
 
         // 1. Calculate individual standard costs
         // IMPORTANT: We must deep/shallow clone each record.
@@ -537,6 +564,12 @@ document.addEventListener('DOMContentLoaded', () => {
             clone._finalCost = costs.finalCost;
             totalGlobalDailyCost += clone._dailyCost;
             totalGlobalPrice += clone.price;
+            
+            const status = clone.status || 'active';
+            if (status === 'active') countActive++;
+            else if (status === 'broken') countBroken++;
+            else if (status === 'sold') countSold++;
+            
             return clone;
         });
 
@@ -555,6 +588,11 @@ document.addEventListener('DOMContentLoaded', () => {
                     animateValue(globalTotalPrice, oldPriceVal, totalGlobalPrice, 800, true);
                 }
             }
+            
+            document.getElementById('statTotal').textContent = countTotal;
+            document.getElementById('statActive').textContent = countActive;
+            document.getElementById('statBroken').textContent = countBroken;
+            document.getElementById('statSold').textContent = countSold;
         }
 
         // 2. Separate into parents and children
@@ -570,31 +608,60 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
 
-        // 3. Aggregate costs into parents
+        // 3. FULL AGGREGATION: Aggregate costs into all parents before filtering!
+        // This ensures a parent's cost is always correct even if some children are filtered out of view.
         topLevelRecords.forEach(parent => {
             parent._aggDailyCost = parent._dailyCost;
             parent._aggFinalCost = parent._finalCost;
             parent._aggPrice = parent.price;
+            let aggMaxDays = parent._days;
             
             const children = childrenMap[parent.id] || [];
             children.forEach(child => {
                 parent._aggDailyCost += child._dailyCost;
                 parent._aggFinalCost += child._finalCost;
                 parent._aggPrice += child.price;
+                if (child._days > aggMaxDays) {
+                    aggMaxDays = child._days;
+                }
             });
             
             // To work with existing sorting logic seamlessly
             parent._dailyCost = parent._aggDailyCost; 
             parent.price = parent._aggPrice;
             parent._finalCost = parent._aggFinalCost;
+            parent._days = aggMaxDays;
         });
 
-        // 4. Filtering (Apply to top-level records)
-        let sortedRecords = [...topLevelRecords];
+        // 4. Apply Advanced Tree Filtering (Text + Status)
+        const query = (searchInput.value || '').trim().toLowerCase();
         const filterMode = filterSelect.value;
-        if (filterMode !== 'all') {
-            sortedRecords = sortedRecords.filter(r => (r.status || 'active') === filterMode);
+
+        function passesCriteria(r) {
+            const matchesSearch = query ? r.item_name.toLowerCase().includes(query) : true;
+            const matchesStatus = filterMode !== 'all' ? (r.status || 'active') === filterMode : true;
+            return matchesSearch && matchesStatus;
         }
+
+        let sortedRecords = [];
+        const filteredChildrenMap = {}; // We will only render children inside this map!
+
+        topLevelRecords.forEach(parent => {
+            const parentMatchesTextAndStatus = passesCriteria(parent);
+            const allChildren = childrenMap[parent.id] || [];
+            let validChildren = allChildren.filter(child => passesCriteria(child));
+
+            // If the parent strictly matches BOTH query and status, pull in ALL of its children that match the STATUS (ignoring text query for them).
+            if (parentMatchesTextAndStatus) {
+                validChildren = allChildren.filter(child => filterMode !== 'all' ? (child.status || 'active') === filterMode : true);
+            }
+
+            // We keep the parent IF it matches directly OR if it has ANY valid children to show
+            if (parentMatchesTextAndStatus || validChildren.length > 0) {
+                sortedRecords.push(parent);
+                filteredChildrenMap[parent.id] = validChildren;
+            }
+        });
 
         if (sortedRecords.length === 0) {
             historyList.innerHTML = '<p style="text-align:center; color:#94a3b8; font-size:0.9rem;">没有符合条件的记录</p>';
@@ -616,7 +683,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // 6. Rendering
         sortedRecords.forEach(record => {
-            const children = childrenMap[record.id] || [];
+            const children = filteredChildrenMap[record.id] || [];
             if (children.length > 0) children.sort(sortFn);
             
             let wrapperHtml = `<div class="record-wrapper">`;
@@ -666,4 +733,147 @@ document.addEventListener('DOMContentLoaded', () => {
         };
         window.requestAnimationFrame(step);
     }
+
+    // --- Export / Import Logic ---
+    const exportCsvBtn = document.getElementById('exportCsvBtn');
+    const backupExportBtn = document.getElementById('backupExportBtn');
+    const backupImportBtn = document.getElementById('backupImportBtn');
+    const importFileInput = document.getElementById('importFileInput');
+    const importChoiceModal = document.getElementById('importChoiceModal');
+    let tempDataToImport = null;
+
+    if (exportCsvBtn) {
+        exportCsvBtn.addEventListener('click', () => {
+            if (!globalRecords || globalRecords.length === 0) {
+                alert('没有可导出的数据');
+                return;
+            }
+
+            const headers = ['ID', '归属组合ID', '物品名称', '花费金额', '购买日期', '状态', '记录时间', '结束日期', '回血残值', '日均成本(算后)', '总天数(算后)', '最终折算金额(算后)'];
+            
+            const rows = globalRecords.map(r => {
+                const statusMap = { 'active': '使用中', 'broken': '已损坏', 'sold': '已售出' };
+                const statusStr = statusMap[r.status] || '使用中';
+                return [
+                    r.id,
+                    r.parent_id || '',
+                    `"${r.item_name}"`,
+                    r.price,
+                    r.purchase_date,
+                    statusStr,
+                    r.created_at,
+                    r.end_date || '',
+                    r.resale_price || 0,
+                    r._dailyCost?.toFixed(2) || '',
+                    r._days || '',
+                    r._finalCost?.toFixed(2) || ''
+                ];
+            });
+
+            let csvContent = "data:text/csv;charset=utf-8,\uFEFF" + headers.join(',') + "\n";
+            rows.forEach(rowArray => {
+                const row = rowArray.join(",");
+                csvContent += row + "\r\n";
+            });
+
+            const encodedUri = encodeURI(csvContent);
+            const link = document.createElement("a");
+            link.setAttribute("href", encodedUri);
+            link.setAttribute("download", `DayCost_Export_${new Date().toISOString().split('T')[0]}.csv`);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        });
+    }
+
+    if (backupExportBtn) {
+        backupExportBtn.addEventListener('click', () => {
+            if (!globalRecords || globalRecords.length === 0) {
+                alert('没有可导出的数据');
+                return;
+            }
+            
+            // Exclude calculated frontend local values (_*)
+            const cleanRecords = globalRecords.map(r => {
+                const clean = { ...r };
+                for(let key in clean) {
+                    if(key.startsWith('_')) delete clean[key];
+                }
+                return clean;
+            });
+
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(cleanRecords, null, 2));
+            const link = document.createElement("a");
+            link.setAttribute("href", dataStr);
+            link.setAttribute("download", `DayCost_Backup_${new Date().toISOString().split('T')[0]}.daycost`);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        });
+    }
+
+    if (backupImportBtn) {
+        backupImportBtn.addEventListener('click', () => {
+            importFileInput.value = '';
+            importFileInput.click();
+        });
+    }
+
+    if (importFileInput) {
+        importFileInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(evt) {
+                try {
+                    const json = JSON.parse(evt.target.result);
+                    if (!Array.isArray(json)) throw new Error('无效的文件格式');
+                    tempDataToImport = json;
+                    importChoiceModal.classList.remove('hidden');
+                } catch(err) {
+                    alert('解析备份文件失败: ' + err.message);
+                }
+            };
+            reader.readAsText(file);
+        });
+    }
+
+    if (importChoiceModal) {
+        document.getElementById('importCancelBtn').addEventListener('click', () => {
+            importChoiceModal.classList.add('hidden');
+            tempDataToImport = null;
+        });
+
+        async function executeImport(mode) {
+            importChoiceModal.classList.add('hidden');
+            if (!tempDataToImport) return;
+
+            try {
+                const res = await fetch('/api/records/import', {
+                    method: 'POST',
+                    headers: getHeaders(),
+                    body: JSON.stringify({
+                        mode: mode,
+                        records: tempDataToImport
+                    })
+                });
+                const data = await res.json();
+                if (res.ok) {
+                    alert('数据恢复成功！');
+                    loadHistory();
+                } else {
+                    alert(data.error);
+                }
+            } catch(e) {
+                alert('导入请求失败');
+            } finally {
+                tempDataToImport = null;
+            }
+        }
+
+        document.getElementById('importOverwriteBtn').addEventListener('click', () => executeImport('overwrite'));
+        document.getElementById('importAppendBtn').addEventListener('click', () => executeImport('append'));
+    }
+
 });

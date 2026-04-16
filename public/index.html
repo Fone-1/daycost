@@ -8,24 +8,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 </head>
 <body>
-    <div class="user-status" id="userStatus" style="display: none;">
-        <span>欢迎，<span id="displayUsername">User</span></span>
-        <button id="changePwdBtn" class="btn-small">改密</button>
-        <button id="logoutBtn" class="btn-small">退出</button>
-    </div>
-
-    <!-- Global Stats Overlay (Top Left) -->
-    <div id="globalStatsBox" class="hidden" style="position: absolute; top: 20px; left: 20px; padding: 10px 18px; background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 20px; backdrop-filter: blur(10px); display: flex; align-items: center; gap: 15px;">
-        <div style="text-align: right;">
-            <span style="color: #94a3b8; font-size: 0.75rem; display:block; margin-bottom: 2px;">资金总投入</span>
-            <div style="font-size: 1.1rem; font-weight: 700; color: #f8fafc; line-height: 1;">￥<span id="globalTotalPrice">0.00</span></div>
-        </div>
-        <div style="width: 1px; height: 28px; background: rgba(255,255,255,0.15);"></div>
-        <div>
-            <span style="color: #94a3b8; font-size: 0.75rem; display:block; margin-bottom: 2px;">当前每日总耗</span>
-            <div style="font-size: 1.1rem; font-weight: 700; color: #10b981; line-height: 1;">￥<span id="globalTotalDaily">0.00</span><span style="font-size: 0.8rem; color: #94a3b8; font-weight: normal;"> /天</span></div>
-        </div>
-    </div>
+    <!-- Old absolute User Status and Global Stats Box have been removed and placed into SPA panes -->
 
     <!-- Auth Section -->
     <div class="container" id="authSection">
@@ -57,67 +40,153 @@
         </main>
     </div>
 
-    <!-- Dashboard Section -->
-    <div class="container dashboard-container hidden" id="dashboardSection">
-        <header>
-            <h1>DayCost</h1>
-            <p>计算你的物品“日均使用成本”</p>
-        </header>
-
-        <main>
-            <div class="card glass">
-                <form id="costForm">
-                    <div class="form-group">
-                        <label for="itemName">物品名称 (可选)</label>
-                        <input type="text" id="itemName" placeholder="例如：iPhone 15">
-                    </div>
-                    <div class="form-group">
-                        <label for="parentSelect">归属组合 (如: 主机)</label>
-                        <select id="parentSelect" class="sort-select" style="width: 100%;">
-                            <option value="">- 独立物品 -</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label for="price">花费金额 (元)</label>
-                        <input type="number" id="price" required min="0" step="0.01" placeholder="0.00">
-                    </div>
-                    <div class="form-group">
-                        <label for="purchaseDate">购买日期</label>
-                        <input type="date" id="purchaseDate" required>
-                    </div>
-                    <button type="submit" class="btn">计算日均成本</button>
-                </form>
-
-
+    <!-- Dashboard Section (SPA Container) -->
+    <div class="container dashboard-container hidden" id="dashboardSection" style="max-width: 1200px;">
+        
+        <!-- Top Navigation Bar -->
+        <nav class="main-nav glass" style="margin-bottom: 2rem; display: flex; align-items: center; padding: 0.8rem 1.5rem; border-radius: 16px;">
+            <div style="display: flex; gap: 1rem; flex: 1; justify-content: center; margin-left: 100px;">
+                <button class="nav-btn active" data-target="pane-home">🏠 账本主页</button>
+                <button class="nav-btn" data-target="pane-stats">📊 统计看板</button>
+                <button class="nav-btn" data-target="pane-settings">⚙️ 系统设置</button>
             </div>
+            <div style="font-size: 1.4rem; font-weight: 700; background: linear-gradient(to right, #60a5fa, #a78bfa); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">DayCost</div>
+        </nav>
 
-            <!-- History Section -->
-            <div class="history-section glass" style="display: flex; flex-direction: column;">
-                <div class="history-header">
-                    <h2>历史记录</h2>
-                    <div style="display:flex; gap:0.5rem; align-items:center;">
-                        <span style="color:#cbd5e1; font-size:0.8rem;">过滤</span>
-                        <select id="filterSelect" class="sort-select">
-                            <option value="all">全部展示</option>
-                            <option value="active">使用中</option>
-                            <option value="broken">已损坏</option>
-                            <option value="sold">已退役(回血)</option>
-                        </select>
-                        <select id="sortSelect" class="sort-select">
-                            <option value="dateDesc">最新添加</option>
-                            <option value="costDesc">日均成本从高到低</option>
-                            <option value="costAsc">日均成本从低到高</option>
-                            <option value="priceDesc">总价从高到低</option>
-                            <option value="daysDesc">使用天数长到短</option>
-                            <option value="daysAsc">使用天数短到长</option>
-                        </select>
+        <!-- Pane: Home -->
+        <div id="pane-home" class="spa-pane active">
+
+            <main>
+                <div class="card glass">
+                    <form id="costForm">
+                        <div class="form-group">
+                            <label for="itemName">物品名称</label>
+                            <input type="text" id="itemName" required placeholder="例如：iPhone 15">
+                        </div>
+                        <div class="form-group">
+                            <label for="parentSelect">归属组合 (如: 主机)</label>
+                            <select id="parentSelect" class="sort-select" style="width: 100%;">
+                                <option value="">- 独立物品 -</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="price">花费金额 (元)</label>
+                            <input type="number" id="price" required min="0" step="0.01" placeholder="0.00">
+                        </div>
+                        <div class="form-group">
+                            <label for="purchaseDate">购买日期</label>
+                            <input type="date" id="purchaseDate" required>
+                        </div>
+                        <button type="submit" class="btn">计算日均成本</button>
+                    </form>
+                </div>
+
+                <div class="history-section glass" style="display: flex; flex-direction: column;">
+                    <div class="history-header">
+                        <h2>历史记录</h2>
+                        <div style="display:flex; gap:0.5rem; align-items:center; flex-wrap: wrap;">
+                            <input type="text" id="searchInput" placeholder="搜索物品..." class="sort-select" style="width: 140px; padding: 0.5rem 1rem; background-image: none;">
+                            <span style="color:#cbd5e1; font-size:0.8rem; margin-left: 0.5rem;">过滤</span>
+                            <select id="filterSelect" class="sort-select">
+                                <option value="all">全部展示</option>
+                                <option value="active">使用中</option>
+                                <option value="broken">已损坏</option>
+                                <option value="sold">已退役(回血)</option>
+                            </select>
+                            <select id="sortSelect" class="sort-select">
+                                <option value="dateDesc">最新添加</option>
+                                <option value="costDesc">日均成本从高到低</option>
+                                <option value="costAsc">日均成本从低到高</option>
+                                <option value="priceDesc">总价从高到低</option>
+                                <option value="daysDesc">使用天数长到短</option>
+                                <option value="daysAsc">使用天数短到长</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div id="historyList" class="history-list">
+                        <!-- History items will be injected here -->
                     </div>
                 </div>
-                <div id="historyList" class="history-list">
-                    <!-- History items will be injected here -->
+            </main>
+        </div>
+
+        <!-- Pane: Statistics -->
+        <div id="pane-stats" class="spa-pane hidden">
+            <header>
+                <h2>财务大盘</h2>
+                <p style="color: #94a3b8; font-size: 0.9rem;">全局数字指标面板，掌握所有的资金流动走向。</p>
+            </header>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-top: 2rem;">
+                
+                <!-- Expanded Global Stats Box -->
+                <div id="globalStatsBox" class="card glass" style="display: flex; flex-direction: column; gap: 15px; padding: 2rem;">
+                    <div style="display: flex; align-items: center; justify-content: space-around; gap: 15px;">
+                        <div style="text-align: center;">
+                            <span style="color: #94a3b8; font-size: 1rem; display:block; margin-bottom: 8px;">每日系统级账面总耗散</span>
+                            <div style="font-size: 2.5rem; font-weight: 700; color: #10b981; line-height: 1; text-shadow: 0 0 20px rgba(16, 185, 129, 0.4);">￥<span id="globalTotalDaily">0.00</span><span style="font-size: 1.2rem; color: #94a3b8; font-weight: normal;"> /天</span></div>
+                        </div>
+                        <div style="width: 1px; height: 60px; background: rgba(255,255,255,0.15);"></div>
+                        <div style="text-align: center;">
+                            <span style="color: #94a3b8; font-size: 1rem; display:block; margin-bottom: 8px;">历史资金总投入额度</span>
+                            <div style="font-size: 2rem; font-weight: 700; color: #f8fafc; line-height: 1;">￥<span id="globalTotalPrice">0.00</span></div>
+                        </div>
+                    </div>
+                    <div style="display: flex; justify-content: center; gap: 20px; font-size: 1rem; color: #cbd5e1; border-top: 1px dashed rgba(255,255,255,0.1); padding-top: 20px; margin-top: 10px;">
+                        <span>总零件: <strong id="statTotal" style="color:white; font-size: 1.2rem;">0</strong></span>
+                        <span><span style="color:#10b981; font-size: 0.8rem; vertical-align: middle;">🟢</span> 正常运作: <strong id="statActive" style="color:white; font-size: 1.2rem;">0</strong></span>
+                        <span><span style="color:#ef4444; font-size: 0.8rem; vertical-align: middle;">🔴</span> 核心损毁: <strong id="statBroken" style="color:white; font-size: 1.2rem;">0</strong></span>
+                        <span><span style="color:#eab308; font-size: 0.8rem; vertical-align: middle;">🟡</span> 闲置回血: <strong id="statSold" style="color:white; font-size: 1.2rem;">0</strong></span>
+                    </div>
+                </div>
+
+                <div class="card glass" style="display: flex; align-items: center; justify-content: center; padding: 2rem;">
+                     <p style="color: #64748b; font-style: italic;">图表扩展区域 (规划中...)</p>
                 </div>
             </div>
-        </main>
+        </div>
+
+        <!-- Pane: Settings -->
+        <div id="pane-settings" class="spa-pane hidden">
+            <header>
+                <h2>系统设置与数据中心</h2>
+            </header>
+            <div style="display: grid; grid-template-columns: 1fr; gap: 1.5rem; margin-top: 2rem; max-width: 600px; margin-left: auto; margin-right: auto;">
+                
+                <!-- Account Box -->
+                <div class="card glass" style="padding: 1.5rem;">
+                    <h3 style="margin-bottom: 1rem; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 0.5rem;">👤 账号设置</h3>
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <span style="font-size: 1.1rem; color: #e2e8f0;">当前账号：<span id="displayUsername" style="font-weight:bold; color: #60a5fa;">User</span></span>
+                        <div style="display: flex; gap: 10px;">
+                            <button id="changePwdBtn" class="btn" style="padding: 8px 16px; background: rgba(255,255,255,0.1);">修改密码</button>
+                            <button id="logoutBtn" class="btn" style="padding: 8px 16px; background: var(--danger);">退出登录</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Data Sync Box -->
+                <div class="card glass" style="padding: 1.5rem;">
+                    <h3 style="margin-bottom: 1rem; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 0.5rem;">🗂️ 账本数据管理</h3>
+                    <p style="color: #94a3b8; font-size: 0.9rem; margin-bottom: 1.5rem;">导出您的财务数据至本地进行高级分析，或进行跨设备、跨版本的数据恢复。</p>
+                    
+                    <div style="display: flex; flex-direction: column; gap: 10px;">
+                        <button id="exportCsvBtn" class="btn" style="border: 1px solid rgba(16, 185, 129, 0.4); color: #10b981; background: rgba(16, 185, 129, 0.1); text-align: left; padding: 12px 1rem;">
+                            📊 导出报表为 CSV (Excel查看)
+                        </button>
+                        
+                        <button id="backupExportBtn" class="btn" style="border: 1px solid rgba(59, 130, 246, 0.4); color: #60a5fa; background: rgba(59, 130, 246, 0.1); text-align: left; padding: 12px 1rem;">
+                            💾 生成专属 .daycost 加密快照备份
+                        </button>
+
+                        <button id="backupImportBtn" class="btn" style="border: 1px solid rgba(167, 139, 250, 0.4); color: #c4b5fd; background: rgba(167, 139, 250, 0.1); text-align: left; padding: 12px 1rem;">
+                            🔄 从 .daycost 备份快照中恢复系统
+                        </button>
+                        <input type="file" id="importFileInput" accept=".daycost,.json" style="display: none;">
+                    </div>
+                </div>
+
+            </div>
+        </div>
     </div>
 
     <!-- Result Modal -->
@@ -228,6 +297,28 @@
                 <button id="confirmCancelBtn" class="btn" style="background: rgba(255,255,255,0.1); color: white; flex: 1;">取消</button>
                 <button id="confirmOkBtn" class="btn" style="background: var(--danger); color: white; flex: 1;">确认删除</button>
             </div>
+        </div>
+    </div>
+
+    <!-- Import Choice Modal -->
+    <div id="importChoiceModal" class="modal-overlay hidden">
+        <div class="modal-content glass" style="max-width: 420px; text-align: center; padding: 2rem;">
+            <div style="font-size: 3rem; margin-bottom: 1rem;">🗂️</div>
+            <h2 style="margin-bottom:1rem; font-size: 1.3rem;">导入数据方式</h2>
+            <p style="color: #94a3b8; font-size: 0.95rem; margin-bottom: 1rem; line-height: 1.5; text-align: left;">
+                您选择了一个备份文件。接下来要如何处理当前系统中已有的数据？
+            </p>
+            <div style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 1.5rem;">
+                <button id="importOverwriteBtn" class="btn" style="background: rgba(239, 68, 68, 0.15); color: #fca5a5; border: 1px solid rgba(239, 68, 68, 0.4); text-align: left; display: flex; flex-direction: column; padding: 10px 15px;">
+                    <strong style="color: #f8fafc; font-size: 1rem;">覆盖当前数据 (时光倒流)</strong>
+                    <span style="font-size: 0.8rem; font-weight: normal; margin-top: 3px;">⚠️ 清空当前所有记录，将其完全替换为备份文件的内容</span>
+                </button>
+                <button id="importAppendBtn" class="btn" style="background: rgba(59, 130, 246, 0.15); color: #93c5fd; border: 1px solid rgba(59, 130, 246, 0.4); text-align: left; display: flex; flex-direction: column; padding: 10px 15px;">
+                    <strong style="color: #f8fafc; font-size: 1rem;">追加到当前数据</strong>
+                    <span style="font-size: 0.8rem; font-weight: normal; margin-top: 3px;">不删除现有记录，将备份文件中的物品作为新记录插入</span>
+                </button>
+            </div>
+            <button id="importCancelBtn" class="btn" style="background: rgba(255,255,255,0.1); color: white;">取消导入</button>
         </div>
     </div>
 

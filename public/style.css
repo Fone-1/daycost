@@ -33,18 +33,47 @@ body {
     padding-top: 5vh;
 }
 
-.user-status {
-    position: absolute;
-    top: 20px;
-    right: 20px;
-    background: rgba(15, 23, 42, 0.6);
-    padding: 10px 15px;
-    border-radius: 20px;
-    border: 1px solid var(--border-color);
+/* SPA Navigation Layout */
+.spa-pane {
+    display: none;
+    opacity: 0;
+    transition: opacity 0.3s ease-in-out;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding-bottom: 1rem;
+}
+
+.spa-pane.active {
     display: flex;
-    align-items: center;
-    gap: 15px;
-    backdrop-filter: blur(10px);
+    opacity: 1;
+    animation: fadeIn 0.4s ease-out;
+}
+
+.main-nav {
+    flex-shrink: 0;
+}
+
+.nav-btn {
+    padding: 0.5rem 1.5rem;
+    border-radius: 8px;
+    border: none;
+    background: transparent;
+    color: #94a3b8;
+    cursor: pointer;
+    transition: 0.3s;
+    font-weight: 600;
+}
+
+.nav-btn:hover {
+    background: rgba(255,255,255,0.05);
+}
+
+.nav-btn.active {
+    background: rgba(255,255,255,0.15);
+    color: white;
 }
 
 .btn-small {
@@ -71,6 +100,7 @@ body {
 header {
     text-align: center;
     margin-bottom: 2rem;
+    flex-shrink: 0;
 }
 
 header h1 {
