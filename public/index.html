@@ -44,13 +44,13 @@
     <div class="container dashboard-container hidden" id="dashboardSection" style="max-width: 1200px;">
         
         <!-- Top Navigation Bar -->
-        <nav class="main-nav glass" style="margin-bottom: 2rem; display: flex; align-items: center; padding: 0.8rem 1.5rem; border-radius: 16px;">
-            <div style="display: flex; gap: 1rem; flex: 1; justify-content: center; margin-left: 100px;">
+        <nav class="main-nav glass" style="margin-bottom: 1.5rem; display: flex; align-items: center; padding: 0.7rem 1.2rem; border-radius: 16px;">
+            <div class="nav-btn-group">
                 <button class="nav-btn active" data-target="pane-home">🏠 账本主页</button>
                 <button class="nav-btn" data-target="pane-stats">📊 统计看板</button>
                 <button class="nav-btn" data-target="pane-settings">⚙️ 系统设置</button>
             </div>
-            <div style="font-size: 1.4rem; font-weight: 700; background: linear-gradient(to right, #60a5fa, #a78bfa); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">DayCost</div>
+            <div class="nav-brand">DayCost</div>
         </nav>
 
         <!-- Pane: Home -->
@@ -77,70 +77,100 @@
                             <label for="purchaseDate">购买日期</label>
                             <input type="date" id="purchaseDate" required>
                         </div>
+                        <div class="form-group">
+                            <label for="initialStatus">当前状态</label>
+                            <select id="initialStatus" class="sort-select" style="width: 100%;">
+                                <option value="active">🟢 使用中</option>
+                                <option value="broken">🔴 已损坏</option>
+                                <option value="sold">🟡 已退役 (回血)</option>
+                            </select>
+                        </div>
+                        <div class="form-group hidden" id="formEndDateGroup">
+                            <label for="formEndDate">终止日期</label>
+                            <input type="date" id="formEndDate">
+                        </div>
+                        <div class="form-group hidden" id="formResalePriceGroup">
+                            <label for="formResalePrice">回血金额 (元)</label>
+                            <input type="number" id="formResalePrice" min="0" step="0.01" placeholder="0.00">
+                        </div>
                         <button type="submit" class="btn">计算日均成本</button>
                     </form>
                 </div>
 
-                <div class="history-section glass" style="display: flex; flex-direction: column;">
+                <div class="history-section glass">
                     <div class="history-header">
-                        <h2>历史记录</h2>
-                        <div style="display:flex; gap:0.5rem; align-items:center; flex-wrap: wrap;">
-                            <input type="text" id="searchInput" placeholder="搜索物品..." class="sort-select" style="width: 140px; padding: 0.5rem 1rem; background-image: none;">
-                            <span style="color:#cbd5e1; font-size:0.8rem; margin-left: 0.5rem;">过滤</span>
-                            <select id="filterSelect" class="sort-select">
+                        <div class="history-header-top">
+                            <h2>历史记录</h2>
+                            <input type="text" id="searchInput" placeholder="🔍 搜索物品..." class="sort-select search-input">
+                        </div>
+                        <div class="history-header-filters">
+                            <select id="filterSelect" class="sort-select filter-select">
                                 <option value="all">全部展示</option>
                                 <option value="active">使用中</option>
                                 <option value="broken">已损坏</option>
                                 <option value="sold">已退役(回血)</option>
                             </select>
-                            <select id="sortSelect" class="sort-select">
+                            <select id="sortSelect" class="sort-select filter-select">
                                 <option value="dateDesc">最新添加</option>
-                                <option value="costDesc">日均成本从高到低</option>
-                                <option value="costAsc">日均成本从低到高</option>
-                                <option value="priceDesc">总价从高到低</option>
-                                <option value="daysDesc">使用天数长到短</option>
-                                <option value="daysAsc">使用天数短到长</option>
+                                <option value="costDesc">日均成本 ↓</option>
+                                <option value="costAsc">日均成本 ↑</option>
+                                <option value="priceDesc">总价 ↓</option>
+                                <option value="daysDesc">使用天数 ↓</option>
+                                <option value="daysAsc">使用天数 ↑</option>
                             </select>
                         </div>
                     </div>
-                    <div id="historyList" class="history-list">
-                        <!-- History items will be injected here -->
-                    </div>
+                    <div id="historyList" class="history-list"></div>
                 </div>
             </main>
         </div>
 
         <!-- Pane: Statistics -->
         <div id="pane-stats" class="spa-pane hidden">
-            <header>
+            <header class="stats-header">
                 <h2>财务大盘</h2>
-                <p style="color: #94a3b8; font-size: 0.9rem;">全局数字指标面板，掌握所有的资金流动走向。</p>
+                <p>全局数字指标面板，掌握所有的资金流动走向。</p>
             </header>
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-top: 2rem;">
+            <div class="stats-grid">
                 
-                <!-- Expanded Global Stats Box -->
-                <div id="globalStatsBox" class="card glass" style="display: flex; flex-direction: column; gap: 15px; padding: 2rem;">
-                    <div style="display: flex; align-items: center; justify-content: space-around; gap: 15px;">
-                        <div style="text-align: center;">
-                            <span style="color: #94a3b8; font-size: 1rem; display:block; margin-bottom: 8px;">每日系统级账面总耗散</span>
-                            <div style="font-size: 2.5rem; font-weight: 700; color: #10b981; line-height: 1; text-shadow: 0 0 20px rgba(16, 185, 129, 0.4);">￥<span id="globalTotalDaily">0.00</span><span style="font-size: 1.2rem; color: #94a3b8; font-weight: normal;"> /天</span></div>
+                <!-- Main Stats Card -->
+                <div id="globalStatsBox" class="card glass stats-main-card">
+                    <div class="stats-numbers">
+                        <div class="stat-block">
+                            <span class="stat-label">每日系统级账面总耗散</span>
+                            <div class="stat-value-large">¥<span id="globalTotalDaily">0.00</span><span class="stat-unit">/天</span></div>
                         </div>
-                        <div style="width: 1px; height: 60px; background: rgba(255,255,255,0.15);"></div>
-                        <div style="text-align: center;">
-                            <span style="color: #94a3b8; font-size: 1rem; display:block; margin-bottom: 8px;">历史资金总投入额度</span>
-                            <div style="font-size: 2rem; font-weight: 700; color: #f8fafc; line-height: 1;">￥<span id="globalTotalPrice">0.00</span></div>
+                        <div class="stat-divider"></div>
+                        <div class="stat-block">
+                            <span class="stat-label">历史资金总投入额度</span>
+                            <div class="stat-value-medium">¥<span id="globalTotalPrice">0.00</span></div>
                         </div>
                     </div>
-                    <div style="display: flex; justify-content: center; gap: 20px; font-size: 1rem; color: #cbd5e1; border-top: 1px dashed rgba(255,255,255,0.1); padding-top: 20px; margin-top: 10px;">
-                        <span>总零件: <strong id="statTotal" style="color:white; font-size: 1.2rem;">0</strong></span>
-                        <span><span style="color:#10b981; font-size: 0.8rem; vertical-align: middle;">🟢</span> 正常运作: <strong id="statActive" style="color:white; font-size: 1.2rem;">0</strong></span>
-                        <span><span style="color:#ef4444; font-size: 0.8rem; vertical-align: middle;">🔴</span> 核心损毁: <strong id="statBroken" style="color:white; font-size: 1.2rem;">0</strong></span>
-                        <span><span style="color:#eab308; font-size: 0.8rem; vertical-align: middle;">🟡</span> 闲置回血: <strong id="statSold" style="color:white; font-size: 1.2rem;">0</strong></span>
+                    <div class="stats-badges">
+                        <div class="stat-badge">
+                            <span class="badge-num" id="statTotal">0</span>
+                            <span class="badge-label">总零件</span>
+                        </div>
+                        <div class="stat-badge active">
+                            <span class="badge-dot">🟢</span>
+                            <span class="badge-num" id="statActive">0</span>
+                            <span class="badge-label">正常运作</span>
+                        </div>
+                        <div class="stat-badge broken">
+                            <span class="badge-dot">🔴</span>
+                            <span class="badge-num" id="statBroken">0</span>
+                            <span class="badge-label">核心损毁</span>
+                        </div>
+                        <div class="stat-badge sold">
+                            <span class="badge-dot">🟡</span>
+                            <span class="badge-num" id="statSold">0</span>
+                            <span class="badge-label">闲置回血</span>
+                        </div>
                     </div>
                 </div>
 
-                <div class="card glass" style="display: flex; align-items: center; justify-content: center; padding: 2rem;">
-                     <p style="color: #64748b; font-style: italic;">图表扩展区域 (规划中...)</p>
+                <div class="card glass stats-chart-card">
+                    <p class="chart-placeholder">图表扩展区域 (规划中...)</p>
                 </div>
             </div>
         </div>
@@ -296,6 +326,18 @@
             <div style="display: flex; gap: 1rem; justify-content: center;">
                 <button id="confirmCancelBtn" class="btn" style="background: rgba(255,255,255,0.1); color: white; flex: 1;">取消</button>
                 <button id="confirmOkBtn" class="btn" style="background: var(--danger); color: white; flex: 1;">确认删除</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Custom Alert Modal -->
+    <div id="customAlertModal" class="modal-overlay hidden">
+        <div class="modal-content glass" style="max-width: 380px; text-align: center; padding: 2rem;">
+            <div style="font-size: 3rem; margin-bottom: 1rem;">❌</div>
+            <h2 id="alertTitle" style="margin-bottom:1rem; font-size: 1.3rem;">错误提示</h2>
+            <p id="alertMessage" style="color: #94a3b8; font-size: 0.95rem; margin-bottom: 2rem; line-height: 1.5;"></p>
+            <div style="display: flex; justify-content: center;">
+                <button id="alertOkBtn" class="btn" style="background: var(--primary); color: white; flex: 1; margin-top: 0;">我知道了</button>
             </div>
         </div>
     </div>

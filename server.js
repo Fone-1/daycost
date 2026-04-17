@@ -143,13 +143,15 @@ app.get('/api/records', authenticateToken, (req, res) => {
 
 // Add Record
 app.post('/api/records', authenticateToken, (req, res) => {
-    const { item_name, price, purchase_date, parent_id } = req.body;
+    const { item_name, price, purchase_date, parent_id, status, end_date, resale_price } = req.body;
+    const validStatuses = ['active', 'broken', 'sold'];
+    const recordStatus = validStatuses.includes(status) ? status : 'active';
     
     if (price == null || !purchase_date) return res.status(400).json({ error: '花费金额和购买日期必填' });
 
     db.run(
-        `INSERT INTO records (user_id, item_name, price, purchase_date, parent_id) VALUES (?, ?, ?, ?, ?)`,
-        [req.user.id, item_name, price, purchase_date, parent_id || null],
+        `INSERT INTO records (user_id, item_name, price, purchase_date, parent_id, status, end_date, resale_price) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        [req.user.id, item_name, price, purchase_date, parent_id || null, recordStatus, end_date || null, resale_price || 0],
         function(err) {
             if (err) return res.status(500).json({ error: '保存失败' });
             res.json({ id: this.lastID, message: '记录已保存' });

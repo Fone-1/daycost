@@ -110,6 +110,20 @@ document.addEventListener('DOMContentLoaded', () => {
     let isLoginMode = true;
     let globalRecords = [];
 
+    // --- Custom Alert Modal Logic ---
+    const customAlertModal = document.getElementById('customAlertModal');
+    const alertMessage = document.getElementById('alertMessage');
+    const alertOkBtn = document.getElementById('alertOkBtn');
+    
+    window.showAppAlert = function(msg) {
+        alertMessage.innerText = msg;
+        customAlertModal.classList.remove('hidden');
+    };
+    
+    alertOkBtn.addEventListener('click', () => {
+        customAlertModal.classList.add('hidden');
+    });
+
     // --- Initial Setup ---
     const todayStr = new Date().toISOString().split('T')[0];
     dateInput.max = todayStr;
@@ -260,7 +274,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const data = await res.json();
             
             if (res.ok) {
-                alert(data.message);
+                showAppAlert(data.message);
                 passwordModal.classList.add('hidden');
                 logoutBtn.click(); // force re-login
             } else {
@@ -281,6 +295,35 @@ document.addEventListener('DOMContentLoaded', () => {
         };
     }
 
+    // --- Dynamic form fields based on status ---
+    const initialStatusSelect = document.getElementById('initialStatus');
+    const formEndDateGroup = document.getElementById('formEndDateGroup');
+    const formResalePriceGroup = document.getElementById('formResalePriceGroup');
+    const formEndDate = document.getElementById('formEndDate');
+    const purchaseDateInput = document.getElementById('purchaseDate');
+
+    // Make sure end date calendar cannot select dates before purchase date
+    purchaseDateInput.addEventListener('change', () => {
+        formEndDate.min = purchaseDateInput.value;
+        if (formEndDate.value && new Date(formEndDate.value) < new Date(purchaseDateInput.value)) {
+            formEndDate.value = purchaseDateInput.value;
+        }
+    });
+
+    initialStatusSelect.addEventListener('change', () => {
+        const val = initialStatusSelect.value;
+        if (val === 'active') {
+            formEndDateGroup.classList.add('hidden');
+            formResalePriceGroup.classList.add('hidden');
+        } else if (val === 'broken') {
+            formEndDateGroup.classList.remove('hidden');
+            formResalePriceGroup.classList.add('hidden');
+        } else if (val === 'sold') {
+            formEndDateGroup.classList.remove('hidden');
+            formResalePriceGroup.classList.remove('hidden');
+        }
+    });
+
     // --- Calculator Logic ---
     costForm.addEventListener('submit', async (e) => {
         e.preventDefault();
@@ -289,12 +332,34 @@ document.addEventListener('DOMContentLoaded', () => {
         const price = parseFloat(document.getElementById('price').value);
         const purchaseDateStr = document.getElementById('purchaseDate').value;
         const parent_id = parentSelect.value || null;
-        
-        // Mock a record temporarily for front end calculation
+        const status = initialStatusSelect.value;
+        const end_date = formEndDate.value || null;
+        const resale_price = parseFloat(document.getElementById('formResalePrice').value) || 0;
+
+        // Validate end_date when status requires it
+        if (status === 'broken' || status === 'sold') {
+            if (!end_date) {
+                formEndDate.focus();
+                formEndDate.style.borderColor = 'var(--danger)';
+                setTimeout(() => formEndDate.style.borderColor = '', 2000);
+                return;
+            }
+            if (new Date(end_date) < new Date(purchaseDateStr)) {
+                showAppAlert('终止日期不能早于购买日期！');
+                formEndDate.focus();
+                formEndDate.style.borderColor = 'var(--danger)';
+                setTimeout(() => formEndDate.style.borderColor = '', 2000);
+                return;
+            }
+        }
+
+        // Preview calculation using chosen status
         const { dailyCost, actualDaysForCalc } = calculateCost({
-            price, 
+            price,
             purchase_date: purchaseDateStr,
-            status: 'active'
+            status,
+            end_date,
+            resale_price
         });
 
         // Save to backend
@@ -302,16 +367,17 @@ document.addEventListener('DOMContentLoaded', () => {
             const res = await fetch('/api/records', {
                 method: 'POST',
                 headers: getHeaders(),
-                body: JSON.stringify({ item_name: itemName, price, purchase_date: purchaseDateStr, parent_id })
+                body: JSON.stringify({ item_name: itemName, price, purchase_date: purchaseDateStr, parent_id, status, end_date, resale_price })
             });
             if (res.ok) {
-                // 清空表格
                 costForm.reset();
+                // Reset conditional fields
+                formEndDateGroup.classList.add('hidden');
+                formResalePriceGroup.classList.add('hidden');
                 dateInput.max = todayStr;
                 dateInput.value = todayStr;
-                loadHistory(); 
+                loadHistory();
 
-                // Display Modal
                 modalResultTitle.textContent = `${itemName} 的日均成本为`;
                 resultModal.classList.remove('hidden');
                 animateValue(modalDailyCost, 0, dailyCost, 1000, true);
@@ -321,7 +387,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 logoutBtn.click();
             }
         } catch(e) {
-            console.error("保存失败", e);
+            console.error('保存失败', e);
         }
     });
 
@@ -391,7 +457,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 statusModal.classList.add('hidden');
                 loadHistory();
             } else {
-                alert(data.error || '更新失败');
+                showAppAlert(data.error || '更新失败');
             }
         } catch (err) { }
     });
@@ -452,10 +518,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (res.ok) {
                     loadHistory();
                 } else {
-                    alert(data.error);
+                    showAppAlert(data.error);
                 }
             } catch(e) {
-                alert('删除失败');
+                showAppAlert('删除失败');
             }
         });
     };
@@ -745,7 +811,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (exportCsvBtn) {
         exportCsvBtn.addEventListener('click', () => {
             if (!globalRecords || globalRecords.length === 0) {
-                alert('没有可导出的数据');
+                showAppAlert('没有可导出的数据');
                 return;
             }
 
@@ -789,7 +855,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (backupExportBtn) {
         backupExportBtn.addEventListener('click', () => {
             if (!globalRecords || globalRecords.length === 0) {
-                alert('没有可导出的数据');
+                showAppAlert('没有可导出的数据');
                 return;
             }
             
@@ -832,7 +898,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     tempDataToImport = json;
                     importChoiceModal.classList.remove('hidden');
                 } catch(err) {
-                    alert('解析备份文件失败: ' + err.message);
+                    showAppAlert('解析备份文件失败: ' + err.message);
                 }
             };
             reader.readAsText(file);
@@ -860,13 +926,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 });
                 const data = await res.json();
                 if (res.ok) {
-                    alert('数据恢复成功！');
+                    showAppAlert('数据恢复成功！');
                     loadHistory();
                 } else {
-                    alert(data.error);
+                    showAppAlert(data.error);
                 }
             } catch(e) {
-                alert('导入请求失败');
+                showAppAlert('导入请求失败');
             } finally {
                 tempDataToImport = null;
             }

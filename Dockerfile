@@ -13,7 +13,8 @@ WORKDIR /usr/src/app
 
 # Install app dependencies
 COPY package*.json ./
-RUN npm install --omit=dev
+# Force build sqlite3 from source against container's GLIBC version
+RUN npm install --omit=dev --build-from-source=sqlite3
 
 # Bundle app source
 COPY . .
