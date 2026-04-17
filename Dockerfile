@@ -1,7 +1,7 @@
-# Use official Node.js image
-FROM node:20-slim
+# Use official Node.js image based on Debian Bookworm for better GLIBC compat
+FROM node:20-bookworm-slim
 
-# Install dependencies for native modules (sqlite3, bcrypt) if necessary
+# Install build tools for native modules (sqlite3, bcrypt)
 RUN apt-get update && apt-get install -y \
     python3 \
     make \
@@ -11,9 +11,9 @@ RUN apt-get update && apt-get install -y \
 # Create app directory
 WORKDIR /usr/src/app
 
-# Install app dependencies
+# Install app dependencies and rebuild native modules from source
 COPY package*.json ./
-RUN npm install --omit=dev
+RUN npm install --omit=dev --build-from-source
 
 # Bundle app source
 COPY . .
