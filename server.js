@@ -29,7 +29,7 @@ const db = new sqlite3.Database(DB_PATH, (err) => {
                 password_hash TEXT NOT NULL,
                 created_at DATETIME DEFAULT CURRENT_TIMESTAMP
             )`);
-            
+
             db.run(`CREATE TABLE IF NOT EXISTS records (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 user_id INTEGER NOT NULL,
@@ -39,12 +39,12 @@ const db = new sqlite3.Database(DB_PATH, (err) => {
                 created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (user_id) REFERENCES users(id)
             )`);
-            
+
             // Safe Migrations (Errors ignored if columns already exist)
-            db.run("ALTER TABLE records ADD COLUMN status TEXT DEFAULT 'active'", (err) => {});
-            db.run("ALTER TABLE records ADD COLUMN end_date TEXT", (err) => {});
-            db.run("ALTER TABLE records ADD COLUMN resale_price REAL DEFAULT 0", (err) => {});
-            db.run("ALTER TABLE records ADD COLUMN parent_id INTEGER DEFAULT NULL", (err) => {});
+            db.run("ALTER TABLE records ADD COLUMN status TEXT DEFAULT 'active'", (err) => { });
+            db.run("ALTER TABLE records ADD COLUMN end_date TEXT", (err) => { });
+            db.run("ALTER TABLE records ADD COLUMN resale_price REAL DEFAULT 0", (err) => { });
+            db.run("ALTER TABLE records ADD COLUMN parent_id INTEGER DEFAULT NULL", (err) => { });
         });
     }
 });
@@ -53,7 +53,7 @@ const db = new sqlite3.Database(DB_PATH, (err) => {
 const authenticateToken = (req, res, next) => {
     const authHeader = req.headers['authorization'];
     const token = authHeader && authHeader.split(' ')[1];
-    
+
     if (token == null) return res.status(401).json({ error: '请先登录' });
 
     jwt.verify(token, JWT_SECRET, (err, user) => {
@@ -72,7 +72,7 @@ app.post('/api/auth/register', async (req, res) => {
 
     try {
         const hashedPassword = await bcrypt.hash(password, 10);
-        db.run(`INSERT INTO users (username, password_hash) VALUES (?, ?)`, [username, hashedPassword], function(err) {
+        db.run(`INSERT INTO users (username, password_hash) VALUES (?, ?)`, [username, hashedPassword], function (err) {
             if (err) {
                 if (err.message.includes('UNIQUE')) {
                     return res.status(400).json({ error: '用户名已存在' });
@@ -89,7 +89,7 @@ app.post('/api/auth/register', async (req, res) => {
 // Login
 app.post('/api/auth/login', (req, res) => {
     const { username, password } = req.body;
-    
+
     db.get(`SELECT * FROM users WHERE username = ?`, [username], async (err, user) => {
         if (err) return res.status(500).json({ error: '服务器错误' });
         if (!user) return res.status(400).json({ error: '用户不存在或密码错误' });
@@ -121,7 +121,7 @@ app.put('/api/auth/password', authenticateToken, (req, res) => {
             if (!match) return res.status(400).json({ error: '原密码错误' });
 
             const hashed = await bcrypt.hash(newPassword, 10);
-            db.run(`UPDATE users SET password_hash = ? WHERE id = ?`, [hashed, req.user.id], function(updateErr) {
+            db.run(`UPDATE users SET password_hash = ? WHERE id = ?`, [hashed, req.user.id], function (updateErr) {
                 if (updateErr) return res.status(500).json({ error: '更新密码失败' });
                 res.json({ message: '密码修改成功，请重新登录' });
             });
@@ -143,16 +143,14 @@ app.get('/api/records', authenticateToken, (req, res) => {
 
 // Add Record
 app.post('/api/records', authenticateToken, (req, res) => {
-    const { item_name, price, purchase_date, parent_id, status, end_date, resale_price } = req.body;
-    const validStatuses = ['active', 'broken', 'sold'];
-    const recordStatus = validStatuses.includes(status) ? status : 'active';
-    
+    const { item_name, price, purchase_date, parent_id } = req.body;
+
     if (price == null || !purchase_date) return res.status(400).json({ error: '花费金额和购买日期必填' });
 
     db.run(
-        `INSERT INTO records (user_id, item_name, price, purchase_date, parent_id, status, end_date, resale_price) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-        [req.user.id, item_name, price, purchase_date, parent_id || null, recordStatus, end_date || null, resale_price || 0],
-        function(err) {
+        `INSERT INTO records (user_id, item_name, price, purchase_date, parent_id) VALUES (?, ?, ?, ?, ?)`,
+        [req.user.id, item_name, price, purchase_date, parent_id || null],
+        function (err) {
             if (err) return res.status(500).json({ error: '保存失败' });
             res.json({ id: this.lastID, message: '记录已保存' });
         }
@@ -162,13 +160,13 @@ app.post('/api/records', authenticateToken, (req, res) => {
 // Delete Record
 app.delete('/api/records/:id', authenticateToken, (req, res) => {
     const recordId = req.params.id;
-    
+
     db.get(`SELECT COUNT(*) as count FROM records WHERE parent_id = ?`, [recordId], (err, row) => {
         if (err) return res.status(500).json({ error: '服务器错误' });
         if (row.count > 0) return res.status(400).json({ error: `无法删除：该物品下还包含 ${row.count} 个子零件，请先删除子零件或将它们解绑！` });
 
         // Check if the record belongs to the user
-        db.run(`DELETE FROM records WHERE id = ? AND user_id = ?`, [recordId, req.user.id], function(deleteErr) {
+        db.run(`DELETE FROM records WHERE id = ? AND user_id = ?`, [recordId, req.user.id], function (deleteErr) {
             if (deleteErr) return res.status(500).json({ error: '删除失败' });
             if (this.changes === 0) return res.status(404).json({ error: '记录不存在或无权限删除' });
             res.json({ message: '记录已删除' });
@@ -203,7 +201,7 @@ app.put('/api/records/:id', authenticateToken, (req, res) => {
         db.run(
             `UPDATE records SET item_name = ?, price = ?, purchase_date = ?, status = ?, end_date = ?, resale_price = ?, parent_id = ? WHERE id = ? AND user_id = ?`,
             [item_name, price, purchase_date, status, end_date || null, resale_price || 0, parent_id || null, recordId, req.user.id],
-            function(err) {
+            function (err) {
                 if (err) return res.status(500).json({ error: '更新失败' });
                 if (this.changes === 0) return res.status(404).json({ error: '记录不存在或无权限' });
                 res.json({ message: '记录已更新' });
@@ -244,7 +242,7 @@ app.post('/api/records/import', authenticateToken, (req, res) => {
                 r.end_date || null,
                 r.resale_price || 0,
                 newParentId || null
-            ], function(err) {
+            ], function (err) {
                 if (err) return callback(err);
                 callback(null, this.lastID);
             });
