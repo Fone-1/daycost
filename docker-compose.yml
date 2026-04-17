@@ -5,7 +5,7 @@ services:
     build: .
     container_name: daycost-app
     ports:
-      - "80:80"
+      - "4567:80"
     environment:
       - PORT=80
       - JWT_SECRET=PLEASE_CHANGE_THIS_SECRET_IN_PRODUCTION
