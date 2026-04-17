@@ -6,8 +6,9 @@ const cors = require('cors');
 const path = require('path');
 
 const app = express();
-const PORT = 3000;
-const JWT_SECRET = 'daycost_super_secret_key_123!';
+const PORT = process.env.PORT || 80;
+const JWT_SECRET = process.env.JWT_SECRET || 'daycost_dev_secret_key_999';
+const DB_PATH = process.env.DB_PATH || path.join(__dirname, 'data.db');
 
 // Middleware
 app.use(cors());
@@ -15,7 +16,7 @@ app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
 // Database setup
-const db = new sqlite3.Database('./data.db', (err) => {
+const db = new sqlite3.Database(DB_PATH, (err) => {
     if (err) {
         console.error('Error opening database', err.message);
     } else {

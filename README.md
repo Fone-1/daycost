@@ -60,25 +60,32 @@
 
 ---
 
-## 📦 部署与运行 / Quick Start
+---
 
-本系统为零配置即可运行的设计：
+## 🛠️ Docker 生产环境部署 (推荐)
 
-1. **安装环境依赖**：
-   确保你的机器上安装了 `Node.js`，然后进入项目根目录：
-   ```bash
-   npm install express sqlite3 bcrypt jsonwebtoken
-   ```
+本项目已针对 Azure 和 Docker 环境进行优化，支持通过 `docker-compose` 快速部署。
 
-2. **启动服务**：
-   ```bash
-   node server.js
-   ```
+### 1. 快速启动 (Docker Compose)
+在本地或服务器执行：
+```bash
+docker-compose up -d --build
+```
+系统将自动：
+- 在 80 端口启动服务。
+- 在当前目录创建 `./data` 文件夹用于持久化数据库（`data.db`）。
 
-3. **打开你的日均成本计算器**：
-   在浏览器中访问：`http://localhost:3000`
-   > *首次使用请点击「注册」设置你的日均成本管理员账号*。
+### 2. 环境变量配置
+在部署到 Azure 或其他平台时，请务必设置以下环境变量：
+- `PORT`: 服务监听端口（默认 80）。
+- `JWT_SECRET`: 极高强度的加密密钥（务必更改，防止凭证被破解）。
+- `DB_PATH`: 数据库存储路径（容器内默认 `/data/data.db`）。
+
+### 3. Azure 特别说明
+- **Azure App Service**: 可以在 Web App 设置中直接添加环境变量，并通过 `SSH` 或 `Deployment Center` 挂载 Azure Files 存储以保证 SQLite 文件持久化。
+- **Azure VM**: 推荐直接使用 `docker-compose`，只需将代码通过 GitHub 拉取到 VM 即可。
 
 ---
 
 > *"DayCost 帮你认清：买得起，不一定用得起；放着吃灰，才是最昂贵的代价。" *
+

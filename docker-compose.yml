@@ -1,0 +1,17 @@
+version: '3.8'
+
+services:
+  app:
+    build: .
+    container_name: daycost-app
+    ports:
+      - "80:80"
+    environment:
+      - PORT=80
+      - JWT_SECRET=PLEASE_CHANGE_THIS_SECRET_IN_PRODUCTION
+      - DB_PATH=/data/data.db
+    volumes:
+      # Map the local 'data' directory to the container's '/data' directory
+      # This ensures your sqlite database is persistent
+      - ./data:/data
+    restart: always
