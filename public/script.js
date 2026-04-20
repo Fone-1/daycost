@@ -109,6 +109,8 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- State ---
     let isLoginMode = true;
     let globalRecords = [];
+    let costChartInstance = null;
+    let trendChartInstance = null;
 
     // --- Custom Alert Modal Logic ---
     const customAlertModal = document.getElementById('customAlertModal');
@@ -775,6 +777,201 @@ document.addEventListener('DOMContentLoaded', () => {
         // Bind tooltip to all newly rendered truncated candidates
         historyList.querySelectorAll('[data-fulltext]').forEach(el => {
             bindTooltip(el, el.dataset.fulltext);
+        });
+
+        // 7. Render Visualization Chart
+        renderChart(topLevelRecords);
+        renderTrendChart(globalRecords);
+    }
+
+    function renderChart(topLevelRecords) {
+        const ctx = document.getElementById('costChart');
+        if (!ctx) return;
+
+        // Sort by daily cost desc
+        const sortedForChart = [...topLevelRecords].sort((a, b) => b._aggDailyCost - a._aggDailyCost);
+        
+        let labels = [];
+        let data = [];
+        let otherCost = 0;
+
+        // Take top 5, group rest into "其他"
+        sortedForChart.forEach((item, index) => {
+            // Ignore items with 0 daily cost
+            if (item._aggDailyCost <= 0) return;
+            
+            if (index < 5) {
+                labels.push(item.item_name);
+                data.push(item._aggDailyCost.toFixed(2));
+            } else {
+                otherCost += item._aggDailyCost;
+            }
+        });
+
+        if (otherCost > 0) {
+            labels.push('其他项并集');
+            data.push(otherCost.toFixed(2));
+        }
+
+        if (costChartInstance) {
+            costChartInstance.destroy();
+        }
+
+        // Only draw if there is data
+        if (data.length === 0) {
+            ctx.classList.add('hidden');
+            return;
+        } else {
+            ctx.classList.remove('hidden');
+        }
+
+        costChartInstance = new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: labels,
+                datasets: [{
+                    data: data,
+                    backgroundColor: [
+                        'rgba(59, 130, 246, 0.8)', // blue
+                        'rgba(167, 139, 250, 0.8)', // purple
+                        'rgba(16, 185, 129, 0.8)', // green
+                        'rgba(245, 158, 11, 0.8)', // yellow
+                        'rgba(239, 68, 68, 0.8)', // red
+                        'rgba(148, 163, 184, 0.8)' // slate (others)
+                    ],
+                    borderColor: 'rgba(15, 23, 42, 1)',
+                    borderWidth: 2
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'right',
+                        labels: { color: '#cbd5e1', font: { size: 11 } }
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                return ' ￥' + context.parsed + ' / 天';
+                            }
+                        }
+                    }
+                },
+                cutout: '70%'
+            }
+        });
+    }
+
+    function simulateCostAtDate(record, targetDate) {
+        const purchaseDate = new Date(record.purchase_date);
+        purchaseDate.setHours(0, 0, 0, 0);
+        
+        if (targetDate < purchaseDate) return 0;
+
+        let endDate = new Date(targetDate.getTime());
+        const status = record.status || 'active';
+        let finalCost = record.price;
+
+        if (status !== 'active' && record.end_date) {
+            const itemEndDate = new Date(record.end_date);
+            itemEndDate.setHours(0, 0, 0, 0);
+
+            if (targetDate >= itemEndDate) {
+                endDate = itemEndDate; // Status resolved by this date
+                if (status === 'sold') {
+                    finalCost = Math.max(0, record.price - (record.resale_price || 0));
+                }
+            }
+        }
+
+        const timeDiff = Math.max(0, endDate.getTime() - purchaseDate.getTime());
+        let daysUsed = Math.floor(timeDiff / (1000 * 3600 * 24));
+        const actualDaysForCalc = daysUsed + 1;
+
+        return finalCost / actualDaysForCalc;
+    }
+
+    function renderTrendChart(records) {
+        const ctx = document.getElementById('trendChart');
+        if (!ctx) return;
+
+        // Sample every 7 days over the last ~6 months (26 points)
+        const points = [];
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
+        for (let i = 25; i >= 0; i--) {
+            const d = new Date(today.getTime());
+            d.setDate(d.getDate() - i * 7);
+            points.push(d);
+        }
+
+        const labels = points.map(d => `${d.getMonth() + 1}/${d.getDate()}`);
+        const data = points.map(bgDate => {
+            let sum = 0;
+            records.forEach(r => {
+                sum += simulateCostAtDate(r, bgDate);
+            });
+            return sum.toFixed(2);
+        });
+
+        if (trendChartInstance) {
+            trendChartInstance.destroy();
+        }
+
+        if (records.length === 0) {
+            ctx.classList.add('hidden');
+            return;
+        } else {
+            ctx.classList.remove('hidden');
+        }
+
+        trendChartInstance = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: '系统总日均耗散 (元)',
+                    data: data,
+                    borderColor: 'rgba(96, 165, 250, 1)', // Light blue
+                    backgroundColor: 'rgba(96, 165, 250, 0.1)',
+                    borderWidth: 2,
+                    pointBackgroundColor: 'rgba(15, 23, 42, 1)',
+                    pointBorderColor: 'rgba(96, 165, 250, 1)',
+                    pointHoverBackgroundColor: 'rgba(96, 165, 250, 1)',
+                    fill: true,
+                    tension: 0.4
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: false
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                return ' ¥' + context.parsed.y + ' / 天';
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        grid: { display: false, color: 'rgba(255, 255, 255, 0.05)' },
+                        ticks: { color: '#94a3b8', maxTicksLimit: 8 }
+                    },
+                    y: {
+                        grid: { color: 'rgba(255, 255, 255, 0.05)' },
+                        ticks: { color: '#94a3b8' },
+                        beginAtZero: true
+                    }
+                }
+            }
         });
     }
 

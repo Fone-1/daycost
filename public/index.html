@@ -170,7 +170,12 @@
                 </div>
 
                 <div class="card glass stats-chart-card">
-                    <p class="chart-placeholder">图表扩展区域 (规划中...)</p>
+                    <canvas id="costChart"></canvas>
+                </div>
+
+                <!-- Trend Chart (Full Width) -->
+                <div class="card glass stats-chart-card" style="grid-column: 1 / -1; min-height: 280px;">
+                    <canvas id="trendChart"></canvas>
                 </div>
             </div>
         </div>
@@ -364,6 +369,7 @@
         </div>
     </div>
 
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="script.js"></script>
 </body>
 </html>

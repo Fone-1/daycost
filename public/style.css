@@ -789,7 +789,8 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
     }
 
     .stats-chart-card {
-        min-height: 80px;
+        min-height: 240px;
+        padding: 1rem;
     }
 
     /* Settings cards stacked */
