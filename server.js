@@ -45,6 +45,8 @@ const db = new sqlite3.Database(DB_PATH, (err) => {
             db.run("ALTER TABLE records ADD COLUMN end_date TEXT", (err) => { });
             db.run("ALTER TABLE records ADD COLUMN resale_price REAL DEFAULT 0", (err) => { });
             db.run("ALTER TABLE records ADD COLUMN parent_id INTEGER DEFAULT NULL", (err) => { });
+            db.run("ALTER TABLE records ADD COLUMN is_deleted INTEGER DEFAULT 0", (err) => { });
+            db.run("ALTER TABLE records ADD COLUMN deleted_at DATETIME DEFAULT NULL", (err) => { });
         });
     }
 });
@@ -133,9 +135,9 @@ app.put('/api/auth/password', authenticateToken, (req, res) => {
 
 // --- RECORDS APIs ---
 
-// Get User Records
+// Get User Records (Active)
 app.get('/api/records', authenticateToken, (req, res) => {
-    db.all(`SELECT * FROM records WHERE user_id = ? ORDER BY created_at DESC`, [req.user.id], (err, rows) => {
+    db.all(`SELECT * FROM records WHERE user_id = ? AND is_deleted = 0 ORDER BY created_at DESC`, [req.user.id], (err, rows) => {
         if (err) return res.status(500).json({ error: '查询失败' });
         res.json(rows);
     });
@@ -157,20 +159,59 @@ app.post('/api/records', authenticateToken, (req, res) => {
     );
 });
 
-// Delete Record
+// Delete Record (Soft Delete)
 app.delete('/api/records/:id', authenticateToken, (req, res) => {
     const recordId = req.params.id;
 
-    db.get(`SELECT COUNT(*) as count FROM records WHERE parent_id = ?`, [recordId], (err, row) => {
+    db.get(`SELECT COUNT(*) as count FROM records WHERE parent_id = ? AND is_deleted = 0`, [recordId], (err, row) => {
         if (err) return res.status(500).json({ error: '服务器错误' });
         if (row.count > 0) return res.status(400).json({ error: `无法删除：该物品下还包含 ${row.count} 个子零件，请先删除子零件或将它们解绑！` });
 
-        // Check if the record belongs to the user
-        db.run(`DELETE FROM records WHERE id = ? AND user_id = ?`, [recordId, req.user.id], function (deleteErr) {
-            if (deleteErr) return res.status(500).json({ error: '删除失败' });
-            if (this.changes === 0) return res.status(404).json({ error: '记录不存在或无权限删除' });
-            res.json({ message: '记录已删除' });
+        db.run(`UPDATE records SET is_deleted = 1, deleted_at = CURRENT_TIMESTAMP WHERE id = ? AND user_id = ?`, [recordId, req.user.id], function (err) {
+            if (err) return res.status(500).json({ error: '移入废纸篓失败' });
+            if (this.changes === 0) return res.status(404).json({ error: '记录不存在或无权限操作' });
+            res.json({ message: '记录已移动到废纸篓，可在30天内找回' });
         });
+    });
+});
+
+// Get Trash Records (Deleted)
+app.get('/api/records/trash', authenticateToken, (req, res) => {
+    // Auto-purge records older than 30 days
+    db.run(`DELETE FROM records WHERE is_deleted = 1 AND deleted_at < datetime('now', '-30 days') AND user_id = ?`, [req.user.id], (err) => {
+        if (err) console.error('Auto purge failed', err);
+        
+        db.all(`SELECT * FROM records WHERE user_id = ? AND is_deleted = 1 ORDER BY deleted_at DESC`, [req.user.id], (err, rows) => {
+            if (err) return res.status(500).json({ error: '查询废纸篓失败' });
+            res.json(rows);
+        });
+    });
+});
+
+// Restore Record
+app.post('/api/records/restore/:id', authenticateToken, (req, res) => {
+    const id = req.params.id;
+    console.log(`Attempting to restore record ${id} for user ${req.user.id}`);
+    db.run(`UPDATE records SET is_deleted = 0, deleted_at = NULL WHERE id = ? AND user_id = ?`, [id, req.user.id], function (err) {
+        if (err) {
+            console.error('Restore error:', err);
+            return res.status(500).json({ error: '服务器内部错误：还原失败' });
+        }
+        if (this.changes === 0) {
+            console.warn(`Restore failed: No changes for record ${id}`);
+            return res.status(404).json({ error: '无法还原：该条记录可能已被永久清理或不存在' });
+        }
+        res.json({ message: '记录已从废纸篓恢复' });
+    });
+});
+
+// Permanent Purge Record
+app.delete('/api/records/purge/:id', authenticateToken, (req, res) => {
+    const id = req.params.id;
+    db.run(`DELETE FROM records WHERE id = ? AND user_id = ? AND is_deleted = 1`, [id, req.user.id], function (err) {
+        if (err) return res.status(500).json({ error: '销毁失败' });
+        if (this.changes === 0) return res.status(404).json({ error: '记录不存在' });
+        res.json({ message: '记录已永久销毁' });
     });
 });
 

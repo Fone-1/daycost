@@ -113,21 +113,53 @@ document.addEventListener('DOMContentLoaded', () => {
     let trendChartInstance = null;
     let chartCurrentParentId = null;
     let clusterizeInstance = null;
+    let trashClusterizeInstance = null;
     let expandedParents = {};
+    let globalTrashRecords = [];
 
     // --- Custom Alert Modal Logic ---
-    const customAlertModal = document.getElementById('customAlertModal');
-    const alertMessage = document.getElementById('alertMessage');
-    const alertOkBtn = document.getElementById('alertOkBtn');
+    const alertIcon = document.getElementById('alertIcon');
+    const alertTitle = document.getElementById('alertTitle');
 
-    window.showAppAlert = function (msg) {
+    window.showAppAlert = function (msg, type = 'error') {
         alertMessage.innerText = msg;
+        if (type === 'success') {
+            alertIcon.innerText = '✅';
+            alertTitle.innerText = '成功';
+            alertTitle.style.color = '#10b981';
+        } else {
+            alertIcon.innerText = '❌';
+            alertTitle.innerText = '错误提示';
+            alertTitle.style.color = '#ef4444';
+        }
         customAlertModal.classList.remove('hidden');
     };
 
     alertOkBtn.addEventListener('click', () => {
         customAlertModal.classList.add('hidden');
     });
+
+    window.showAppConfirm = function (title, msg, onOk, okLabel = '确认') {
+        const modal = document.getElementById('customConfirmModal');
+        document.getElementById('confirmTitle').innerText = title;
+        document.getElementById('confirmMessage').innerText = msg;
+        
+        const okBtn = document.getElementById('confirmOkBtn');
+        const cancelBtn = document.getElementById('confirmCancelBtn');
+        okBtn.innerText = okLabel;
+
+        const newOk = okBtn.cloneNode(true);
+        const newCancel = cancelBtn.cloneNode(true);
+        okBtn.replaceWith(newOk);
+        cancelBtn.replaceWith(newCancel);
+
+        newCancel.addEventListener('click', () => modal.classList.add('hidden'));
+        newOk.addEventListener('click', () => {
+            modal.classList.add('hidden');
+            onOk();
+        });
+        modal.classList.remove('hidden');
+    };
 
     const chartBackBtn = document.getElementById('chartBackBtn');
     if (chartBackBtn) {
@@ -171,6 +203,10 @@ document.addEventListener('DOMContentLoaded', () => {
             if (targetId === 'pane-history' && clusterizeInstance) {
                 // Must force a refresh when the tab becomes visible, otherwise height evaluates to 0
                 setTimeout(() => clusterizeInstance.refresh(true), 10);
+            }
+
+            if (targetId === 'pane-trash') {
+                loadTrash();
             }
         });
     });
@@ -510,43 +546,31 @@ document.addEventListener('DOMContentLoaded', () => {
         statusModal.classList.remove('hidden');
     };
 
-    window.deleteRecord = async function (id) {
+    window.deleteRecord = function (id) {
         const record = globalRecords.find(r => r.id === id);
         if (!record) return;
 
-        const modal = document.getElementById('customConfirmModal');
-        document.getElementById('confirmMessage').innerText = `您确定要永久删除 「${record.item_name}」 这条记录吗？\n(注意：如果有子零件需先解除绑定才能删除)`;
-        modal.classList.remove('hidden');
-
-        const oldOkBtn = document.getElementById('confirmOkBtn');
-        const newOkBtn = oldOkBtn.cloneNode(true);
-        oldOkBtn.replaceWith(newOkBtn);
-
-        const oldCancelBtn = document.getElementById('confirmCancelBtn');
-        const newCancelBtn = oldCancelBtn.cloneNode(true);
-        oldCancelBtn.replaceWith(newCancelBtn);
-
-        newCancelBtn.addEventListener('click', () => {
-            modal.classList.add('hidden');
-        });
-
-        newOkBtn.addEventListener('click', async () => {
-            modal.classList.add('hidden');
-            try {
-                const res = await fetch(`/api/records/${id}`, {
-                    method: 'DELETE',
-                    headers: getHeaders()
-                });
-                const data = await res.json();
-                if (res.ok) {
-                    loadHistory();
-                } else {
-                    showAppAlert(data.error);
+        showAppConfirm(
+            '移入废纸篓？',
+            `您确定要将 「${record.item_name}」 移入废纸篓吗？\n(注意：如果有子零件需先解除绑定才能删除)`,
+            async () => {
+                try {
+                    const res = await fetch(`/api/records/${id}`, {
+                        method: 'DELETE',
+                        headers: getHeaders()
+                    });
+                    const data = await res.json();
+                    if (res.ok) {
+                        loadHistory();
+                    } else {
+                        showAppAlert(data.error);
+                    }
+                } catch (e) {
+                    showAppAlert('操作失败');
                 }
-            } catch (e) {
-                showAppAlert('删除失败');
-            }
-        });
+            },
+            '确认删除'
+        );
     };
 
     function updateParentDropdowns() {
@@ -1199,4 +1223,98 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('importAppendBtn').addEventListener('click', () => executeImport('append'));
     }
 
+    // --- Trash / Recycle Bin Logic ---
+    async function loadTrash() {
+        try {
+            const res = await fetch('/api/records/trash', { headers: getHeaders() });
+            if (!res.ok) throw new Error('无法加载废纸篓');
+            globalTrashRecords = await res.json();
+            renderTrash();
+        } catch (e) {
+            console.error(e);
+            showAppAlert('获取废纸篓数据失败');
+        }
+    }
+
+    function renderTrash() {
+        const trashRows = globalTrashRecords.map(record => {
+            // Calculate days left (30 days total)
+            const deletedDate = new Date(record.deleted_at);
+            const now = new Date();
+            const diffTime = now - deletedDate;
+            const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+            const daysLeft = Math.max(0, 30 - diffDays);
+
+            let countdownClass = 'status-badge';
+            if (daysLeft <= 3) countdownClass += ' bg-red';
+            else if (daysLeft <= 7) countdownClass += ' bg-yellow';
+            else countdownClass += ' bg-blue';
+
+            const countdownBadge = `<span class="${countdownClass}" style="margin-left: 8px;">${daysLeft}天后清理</span>`;
+
+            return `
+                <div class="record-wrapper">
+                    <div class="history-item deleted">
+                        <div class="history-info">
+                            <span class="history-name" style="color: #cbd5e1;">${record.item_name} ${countdownBadge}</span>
+                            <span class="history-meta" style="color: #64748b;">买入 ¥${record.price.toFixed(2)} · 删于 ${record.deleted_at ? record.deleted_at.split(' ')[0] : '未知'}</span>
+                        </div>
+                        <div class="history-actions" style="display: flex; gap: 8px;">
+                            <button class="status-btn" onclick="restoreRecord(${record.id})" title="还原记录" style="background: rgba(16, 185, 129, 0.15); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.2); padding: 5px 12px; border-radius: 10px;">↩️</button>
+                            <button class="delete-btn" onclick="purgeRecord(${record.id})" title="粉碎销毁" style="background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.2); color: #ef4444; padding: 5px 12px; border-radius: 10px;">🔥</button>
+                        </div>
+                    </div>
+                </div>
+            `;
+        });
+
+        if (trashRows.length === 0) {
+            trashRows.push('<div style="text-align:center; color:#94a3b8; padding: 40px;">废纸篓空空如也</div>');
+        }
+
+        if (!trashClusterizeInstance) {
+            trashClusterizeInstance = new Clusterize({
+                rows: trashRows,
+                scrollId: 'trashListScroll',
+                contentId: 'trashListContent'
+            });
+        } else {
+            trashClusterizeInstance.update(trashRows);
+        }
+    }
+
+    window.restoreRecord = async function (id) {
+        try {
+            const res = await fetch(`/api/records/restore/${id}`, { method: 'POST', headers: getHeaders() });
+            const data = await res.json();
+            if (res.ok) {
+                showAppAlert('记录已还原到主页', 'success');
+                loadTrash();
+                loadHistory(); 
+            } else {
+                showAppAlert(data.error || '还原失败：记录可能已过期');
+            }
+        } catch (e) {
+            console.error(e);
+            showAppAlert('网络故障，请稍后再试');
+        }
+    };
+
+    window.purgeRecord = function (id) {
+        showAppConfirm('彻底粉碎记录？', '此操作无法撤销，数据将永久从云端抹除。', async () => {
+            try {
+                const res = await fetch(`/api/records/purge/${id}`, { method: 'DELETE', headers: getHeaders() });
+                if (res.ok) {
+                    showAppAlert('记录已永久销毁');
+                    loadTrash();
+                } else {
+                    const data = await res.json();
+                    showAppAlert(data.error || '销毁过程中遇到问题');
+                }
+            } catch (e) {
+                console.error(e);
+                showAppAlert('销毁失败');
+            }
+        });
+    };
 });

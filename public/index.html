@@ -49,6 +49,7 @@
             <div class="nav-btn-group">
                 <button class="nav-btn active" data-target="pane-home">🏠 账本主页</button>
                 <button class="nav-btn" data-target="pane-stats">📊 统计看板</button>
+                <button class="nav-btn" data-target="pane-trash">♻️ 废纸篓</button>
                 <button class="nav-btn" data-target="pane-settings">⚙️ 系统设置</button>
             </div>
             <div class="nav-brand">DayCost</div>
@@ -226,6 +227,20 @@
 
             </div>
         </div>
+
+        <!-- Pane: Trash -->
+        <div id="pane-trash" class="spa-pane hidden">
+            <header class="trash-header" style="text-align: center; margin-bottom: 2rem;">
+                <h2 style="font-size: 1.8rem; background: linear-gradient(to right, #f87171, #fb923c); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">🗑️ 废纸篓</h2>
+                <p style="color: #94a3b8; font-size: 0.9rem;">记录将在 30 天后根据逻辑被自动永久清理。您可以随时恢复记录重新计费。</p>
+            </header>
+            
+            <div id="trashListScroll" class="history-list clusterize-scroll" style="max-height: 70vh; overflow-y: auto;">
+                <div id="trashListContent" class="clusterize-content">
+                    <!-- Deleted rows will be rendered here -->
+                </div>
+            </div>
+        </div>
     </div>
 
     <!-- Result Modal -->
@@ -342,8 +357,8 @@
     <!-- Custom Alert Modal -->
     <div id="customAlertModal" class="modal-overlay hidden">
         <div class="modal-content glass" style="max-width: 380px; text-align: center; padding: 2rem;">
-            <div style="font-size: 3rem; margin-bottom: 1rem;">❌</div>
-            <h2 id="alertTitle" style="margin-bottom:1rem; font-size: 1.3rem;">错误提示</h2>
+            <div id="alertIcon" style="font-size: 3rem; margin-bottom: 1rem;">❌</div>
+            <h2 id="alertTitle" style="margin-bottom:1rem; font-size: 1.3rem;">提示</h2>
             <p id="alertMessage" style="color: #94a3b8; font-size: 0.95rem; margin-bottom: 2rem; line-height: 1.5;"></p>
             <div style="display: flex; justify-content: center;">
                 <button id="alertOkBtn" class="btn" style="background: var(--primary); color: white; flex: 1; margin-top: 0;">我知道了</button>
