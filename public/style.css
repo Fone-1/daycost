@@ -455,11 +455,14 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 }
 
 .history-list {
-    display: flex;
-    flex-direction: column;
-    gap: 0.8rem;
+    display: block;
     overflow-y: auto;
     padding-right: 5px;
+}
+
+.record-wrapper {
+    padding-bottom: 0.8rem;
+    box-sizing: border-box;
 }
 
 .history-list::-webkit-scrollbar {

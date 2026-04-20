@@ -111,6 +111,9 @@ document.addEventListener('DOMContentLoaded', () => {
     let globalRecords = [];
     let costChartInstance = null;
     let trendChartInstance = null;
+    let chartCurrentParentId = null;
+    let clusterizeInstance = null;
+    let expandedParents = {};
 
     // --- Custom Alert Modal Logic ---
     const customAlertModal = document.getElementById('customAlertModal');
@@ -125,6 +128,19 @@ document.addEventListener('DOMContentLoaded', () => {
     alertOkBtn.addEventListener('click', () => {
         customAlertModal.classList.add('hidden');
     });
+
+    const chartBackBtn = document.getElementById('chartBackBtn');
+    if (chartBackBtn) {
+        chartBackBtn.addEventListener('click', () => {
+            chartCurrentParentId = null;
+            // Hacky but simple: re-render the history view (which re-renders charts)
+            const event = new Event('submit');
+            if (globalRecords.length > 0) {
+                // Re-calculate simply by calling renderHistory again
+                renderHistory();
+            }
+        });
+    }
 
     // --- Initial Setup ---
     const todayStr = new Date().toISOString().split('T')[0];
@@ -151,6 +167,11 @@ document.addEventListener('DOMContentLoaded', () => {
                     pane.classList.add('hidden');
                 }
             });
+
+            if (targetId === 'pane-history' && clusterizeInstance) {
+                // Must force a refresh when the tab becomes visible, otherwise height evaluates to 0
+                setTimeout(() => clusterizeInstance.refresh(true), 10);
+            }
         });
     });
 
@@ -557,15 +578,8 @@ document.addEventListener('DOMContentLoaded', () => {
     searchInput.addEventListener('input', () => renderHistory());
 
     window.toggleChildren = function (parentId) {
-        const container = document.getElementById(`children-${parentId}`);
-        const btn = document.getElementById(`toggleBtn-${parentId}`);
-        if (container.classList.contains('show')) {
-            container.classList.remove('show');
-            btn.innerHTML = `▼ 展开零件明细`;
-        } else {
-            container.classList.add('show');
-            btn.innerHTML = `▲ 收起零件明细`;
-        }
+        expandedParents[parentId] = !expandedParents[parentId];
+        renderHistory();
     }
 
     // Helper to generate a single historic item HTML
@@ -601,15 +615,14 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function renderHistory() {
-        historyList.innerHTML = '';
         const globalStatsBox = document.getElementById('globalStatsBox');
         const globalTotalDaily = document.getElementById('globalTotalDaily');
         const globalTotalPrice = document.getElementById('globalTotalPrice');
 
-        if (globalRecords.length === 0) {
-            historyList.innerHTML = '<p style="text-align:center; color:#94a3b8; font-size:0.9rem;">暂无记录</p>';
-            if (globalStatsBox) globalStatsBox.classList.add('hidden');
-            return;
+        if (globalRecords.length === 0 && globalStatsBox) {
+            globalStatsBox.classList.add('hidden');
+        } else if (globalStatsBox) {
+            globalStatsBox.classList.remove('hidden');
         }
 
         let totalGlobalDailyCost = 0;
@@ -731,11 +744,6 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
 
-        if (sortedRecords.length === 0) {
-            historyList.innerHTML = '<p style="text-align:center; color:#94a3b8; font-size:0.9rem;">没有符合条件的记录</p>';
-            return;
-        }
-
         // 5. Sorting
         const sortMode = sortSelect.value;
         const sortFn = (a, b) => {
@@ -749,60 +757,107 @@ document.addEventListener('DOMContentLoaded', () => {
 
         sortedRecords.sort(sortFn);
 
-        // 6. Rendering
-        sortedRecords.forEach(record => {
+        // 6. Rendering (Virtual List via Clusterize)
+        let virtualRows = [];
+
+        if (sortedRecords.length === 0) {
+            virtualRows.push('<div class="clusterize-no-data" style="text-align:center; color:#94a3b8; padding: 20px;">没有符合条件的记录</div>');
+        } else {
+            sortedRecords.forEach(record => {
             const children = filteredChildrenMap[record.id] || [];
             if (children.length > 0) children.sort(sortFn);
 
-            let wrapperHtml = `<div class="record-wrapper">`;
+            // Push parent row
+            virtualRows.push(`<div class="record-wrapper">${createItemHtml(record, false)}</div>`);
 
-            wrapperHtml += createItemHtml(record, false);
-
-            // Render children if exist
+            // Check if children exist and if they are expanded
             if (children.length > 0) {
                 const totalChildren = children.length;
-                wrapperHtml += `<button class="toggle-children-btn" id="toggleBtn-${record.id}" onclick="toggleChildren(${record.id})">▼ 展开零件明细 (${totalChildren}个部件)</button>`;
-                wrapperHtml += `<div class="children-container" id="children-${record.id}">`;
-                children.forEach(child => {
-                    wrapperHtml += createItemHtml(child, true);
-                });
-                wrapperHtml += `</div>`;
+                const isExpanded = !!expandedParents[record.id];
+                const btnText = isExpanded ? `▲ 收起零件明细` : `▼ 展开零件明细 (${totalChildren}个部件)`;
+                
+                virtualRows.push(`<div class="record-wrapper"><button class="toggle-children-btn" style="width:100%; border-radius:10px; margin-top:5px; margin-bottom:5px;" onclick="toggleChildren(${record.id})">${btnText}</button></div>`);
+                
+                if (isExpanded) {
+                    children.forEach(child => {
+                        virtualRows.push(`<div class="record-wrapper children-container show" style="padding-left:15px; border-left:3px solid var(--primary); margin-left:10px;">${createItemHtml(child, true)}</div>`);
+                    });
+                }
             }
-
-            wrapperHtml += `</div>`;
-
-            historyList.insertAdjacentHTML('beforeend', wrapperHtml);
         });
-
-        // Bind tooltip to all newly rendered truncated candidates
-        historyList.querySelectorAll('[data-fulltext]').forEach(el => {
-            bindTooltip(el, el.dataset.fulltext);
-        });
+        }
+        if (!clusterizeInstance) {
+            clusterizeInstance = new Clusterize({
+                rows: virtualRows,
+                scrollId: 'historyListScroll',
+                contentId: 'historyListContent',
+                callbacks: {
+                    clusterChanged: () => {
+                        // Bind tooltips after new cluster renders
+                        const scrollEl = document.getElementById('historyListScroll');
+                        if(scrollEl) {
+                            scrollEl.querySelectorAll('[data-fulltext]').forEach(el => {
+                                bindTooltip(el, el.dataset.fulltext);
+                            });
+                        }
+                    }
+                }
+            });
+        } else {
+            clusterizeInstance.update(virtualRows);
+        }
 
         // 7. Render Visualization Chart
-        renderChart(topLevelRecords);
+        renderChart(processedRecords);
         renderTrendChart(globalRecords);
     }
 
-    function renderChart(topLevelRecords) {
+    function renderChart(processedRecords) {
         const ctx = document.getElementById('costChart');
         if (!ctx) return;
+        
+        const chartTitle = document.getElementById('chartTitle');
+        const chartBackBtn = document.getElementById('chartBackBtn');
 
-        // Sort by daily cost desc
-        const sortedForChart = [...topLevelRecords].sort((a, b) => b._aggDailyCost - a._aggDailyCost);
+        let dataToShow = [];
+        
+        if (!chartCurrentParentId) {
+            if (chartBackBtn) chartBackBtn.classList.add('hidden');
+            if (chartTitle) chartTitle.innerText = "综合总览：前 5 大消费本体";
+
+            const topLevelMap = {};
+            processedRecords.forEach(r => {
+                if (!r.parent_id) {
+                    topLevelMap[r.id] = { ...r, _aggDailyCost: r._dailyCost };
+                }
+            });
+
+            dataToShow = Object.values(topLevelMap);
+        } else {
+            if (chartBackBtn) chartBackBtn.classList.remove('hidden');
+            const parent = processedRecords.find(r => r.id === chartCurrentParentId);
+            if (chartTitle) chartTitle.innerText = parent ? `拆解: ${parent.item_name}` : '子项分布';
+            
+            // Do not show the parent itself, only children
+            processedRecords.filter(r => r.parent_id === chartCurrentParentId).forEach(c => {
+                dataToShow.push({ ...c, _aggDailyCost: c._dailyCost });
+            });
+        }
+
+        const sortedForChart = dataToShow.sort((a, b) => b._aggDailyCost - a._aggDailyCost);
         
         let labels = [];
         let data = [];
         let otherCost = 0;
+        let originalIds = [];
 
-        // Take top 5, group rest into "其他"
         sortedForChart.forEach((item, index) => {
-            // Ignore items with 0 daily cost
             if (item._aggDailyCost <= 0) return;
             
             if (index < 5) {
                 labels.push(item.item_name);
                 data.push(item._aggDailyCost.toFixed(2));
+                originalIds.push(item.id);
             } else {
                 otherCost += item._aggDailyCost;
             }
@@ -811,13 +866,13 @@ document.addEventListener('DOMContentLoaded', () => {
         if (otherCost > 0) {
             labels.push('其他项并集');
             data.push(otherCost.toFixed(2));
+            originalIds.push(null);
         }
 
         if (costChartInstance) {
             costChartInstance.destroy();
         }
 
-        // Only draw if there is data
         if (data.length === 0) {
             ctx.classList.add('hidden');
             return;
@@ -832,12 +887,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 datasets: [{
                     data: data,
                     backgroundColor: [
-                        'rgba(59, 130, 246, 0.8)', // blue
-                        'rgba(167, 139, 250, 0.8)', // purple
-                        'rgba(16, 185, 129, 0.8)', // green
-                        'rgba(245, 158, 11, 0.8)', // yellow
-                        'rgba(239, 68, 68, 0.8)', // red
-                        'rgba(148, 163, 184, 0.8)' // slate (others)
+                        'rgba(59, 130, 246, 0.8)', 'rgba(167, 139, 250, 0.8)',
+                        'rgba(16, 185, 129, 0.8)', 'rgba(245, 158, 11, 0.8)',
+                        'rgba(239, 68, 68, 0.8)', 'rgba(148, 163, 184, 0.8)'
                     ],
                     borderColor: 'rgba(15, 23, 42, 1)',
                     borderWidth: 2
@@ -846,16 +898,24 @@ document.addEventListener('DOMContentLoaded', () => {
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
+                onClick: (event, elements, chart) => {
+                    if (elements.length > 0) {
+                        const idx = elements[0].index;
+                        const clickedId = originalIds[idx];
+                        if (clickedId && !chartCurrentParentId) {
+                            const hasChildren = processedRecords.some(r => r.parent_id === clickedId);
+                            if (hasChildren) {
+                                chartCurrentParentId = clickedId;
+                                renderHistory();
+                            }
+                        }
+                    }
+                },
                 plugins: {
-                    legend: {
-                        position: 'right',
-                        labels: { color: '#cbd5e1', font: { size: 11 } }
-                    },
+                    legend: { position: 'right', labels: { color: '#cbd5e1', font: { size: 11 } } },
                     tooltip: {
                         callbacks: {
-                            label: function(context) {
-                                return ' ￥' + context.parsed + ' / 天';
-                            }
+                            label: function(context) { return ' ￥' + context.parsed + ' / 天'; }
                         }
                     }
                 },

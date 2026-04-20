@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>日均成本计算器 (DayCost)</title>
     <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/clusterize.js/0.19.0/clusterize.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 </head>
 <body>
@@ -120,7 +121,11 @@
                             </select>
                         </div>
                     </div>
-                    <div id="historyList" class="history-list"></div>
+                    <div id="historyListScroll" class="history-list clusterize-scroll" style="max-height: 65vh; overflow-y: auto;">
+                        <div id="historyListContent" class="clusterize-content">
+                            <!-- Rows go here -->
+                        </div>
+                    </div>
                 </div>
             </main>
         </div>
@@ -166,7 +171,9 @@
                     </div>
                 </div>
 
-                <div class="card glass stats-chart-card">
+                <div class="card glass stats-chart-card" style="position: relative;">
+                    <button id="chartBackBtn" class="btn hidden" style="position: absolute; top: 10px; left: 10px; padding: 4px 12px; font-size: 0.8rem; width: auto; margin: 0; background: rgba(59, 130, 246, 0.2); border: 1px solid rgba(59, 130, 246, 0.5); z-index: 10;">← 返回</button>
+                    <h3 id="chartTitle" style="position: absolute; top: 15px; left: 0; width: 100%; text-align: center; font-size: 0.85rem; color: #94a3b8; font-weight: normal; margin: 0; z-index: 5; pointer-events: none;">排名前5 - 综合耗散</h3>
                     <canvas id="costChart"></canvas>
                 </div>
 
@@ -366,6 +373,7 @@
         </div>
     </div>
 
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/clusterize.js/0.19.0/clusterize.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="script.js"></script>
 </body>

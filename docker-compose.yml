@@ -14,9 +14,9 @@ services:
       # 1. 挂载持久化数据库结构
       - ./data:/data
       # 2. 挂载 public 前端静态文件，每次前端更新无需重启，即刻生效！
-      - ./public:/app/public
+      - ./public:/usr/src/app/public
       # 3. 挂载后端的 server.js（当后端逻辑更新后改完后，只需要运行 `docker-compose restart app` 即可，秒级启动）
-      - ./server.js:/app/server.js
+      - ./server.js:/usr/src/app/server.js
       # 4. 保护容器内部构建好的原生依赖 (如由源码构建的 sqlite3)，防止被宿主机覆盖
-      - /app/node_modules
+      - /usr/src/app/node_modules
     restart: always
