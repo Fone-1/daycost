@@ -169,8 +169,7 @@ header p {
     border-radius: 20px;
     padding: 2rem;
     box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
-    overflow-y: auto;
-    overflow-x: hidden;
+    overflow: visible;
 }
 
 .glass::-webkit-scrollbar {
@@ -505,18 +504,30 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 }
 
 .stats-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 1.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1.2rem;
     flex: 1;
     min-height: 0;
+    width: 100%;
+}
+
+.stats-top-row {
+    display: flex;
+    gap: 1.2rem;
+    flex: 0 0 auto;
+}
+
+.stats-top-row > .card {
+    flex: 1;
+    min-width: 0;
 }
 
 .stats-main-card {
     display: flex;
     flex-direction: column;
-    gap: 1.2rem;
-    padding: 1.8rem;
+    gap: 1rem;
+    padding: 1.2rem;
 }
 
 .stats-numbers {
@@ -1080,4 +1091,53 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 .history-item.deleted {
     opacity: 0.8;
     filter: grayscale(0.2);
+}
+
+.trend-controls {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    background: rgba(15, 23, 42, 0.4);
+    padding: 6px;
+    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.trend-btn {
+    background: transparent;
+    border: none;
+    color: #94a3b8;
+    padding: 6px 12px;
+    font-size: 0.75rem;
+    cursor: pointer;
+    border-radius: 6px;
+    transition: all 0.2s;
+    text-align: center;
+    white-space: nowrap;
+}
+
+.trend-btn:hover {
+    color: white;
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.trend-btn.active {
+    background: #3b82f6;
+    color: white;
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+}
+
+/* Hide scrollbars for a cleaner Look */
+#pane-stats::-webkit-scrollbar {
+    display: none;
+}
+#pane-stats {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+    height: calc(100vh - 110px);
+    overflow: hidden;
+}
+
+.stats-chart-card {
+    padding: 1rem !important;
 }

@@ -111,11 +111,18 @@ document.addEventListener('DOMContentLoaded', () => {
     let globalRecords = [];
     let costChartInstance = null;
     let trendChartInstance = null;
+    let currentTrendRange = '30d';
     let chartCurrentParentId = null;
     let clusterizeInstance = null;
     let trashClusterizeInstance = null;
     let expandedParents = {};
     let globalTrashRecords = [];
+
+    // --- Pagination State ---
+    let currentPage = 1;
+    const itemsPerPage = 50;
+    let hasMoreRecords = true;
+    let isLoadingRecords = false;
 
     // --- Custom Alert Modal Logic ---
     const alertIcon = document.getElementById('alertIcon');
@@ -143,7 +150,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const modal = document.getElementById('customConfirmModal');
         document.getElementById('confirmTitle').innerText = title;
         document.getElementById('confirmMessage').innerText = msg;
-        
+
         const okBtn = document.getElementById('confirmOkBtn');
         const cancelBtn = document.getElementById('confirmCancelBtn');
         okBtn.innerText = okLabel;
@@ -258,6 +265,7 @@ document.addEventListener('DOMContentLoaded', () => {
             dashboardSection.classList.remove('hidden');
             displayUsername.textContent = username;
             loadHistory();
+            loadStats();
         } else {
             authSection.classList.remove('hidden');
             dashboardSection.classList.add('hidden');
@@ -436,6 +444,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 dateInput.max = todayStr;
                 dateInput.value = todayStr;
                 loadHistory();
+                loadStats();
 
                 modalResultTitle.textContent = `${itemName} 的日均成本为`;
                 resultModal.classList.remove('hidden');
@@ -515,6 +524,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (res.ok) {
                 statusModal.classList.add('hidden');
                 loadHistory();
+                loadStats();
             } else {
                 showAppAlert(data.error || '更新失败');
             }
@@ -562,6 +572,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     const data = await res.json();
                     if (res.ok) {
                         loadHistory();
+                        loadStats();
                     } else {
                         showAppAlert(data.error);
                     }
@@ -582,24 +593,119 @@ document.addEventListener('DOMContentLoaded', () => {
         statusEditParentId.innerHTML = optionsHtml;
     }
 
-    // --- History Logic ---
-    async function loadHistory() {
+    async function loadStats() {
+        const globalStatsBox = document.getElementById('globalStatsBox');
+        const globalTotalDaily = document.getElementById('globalTotalDaily');
+        const globalTotalPrice = document.getElementById('globalTotalPrice');
+
         try {
-            const res = await fetch('/api/records', { headers: getHeaders() });
+            const res = await fetch('/api/stats', { headers: getHeaders() });
+            if (!res.ok) return;
+            const stats = await res.json();
+
+            if (stats.total_count === 0) {
+                if (globalStatsBox) globalStatsBox.classList.add('hidden');
+                return;
+            }
+
+            if (globalStatsBox) globalStatsBox.classList.remove('hidden');
+
+            const oldDailyVal = parseFloat(globalTotalDaily.textContent) || 0;
+            animateValue(globalTotalDaily, oldDailyVal, stats.total_daily_cost, 800, true);
+
+            const oldPriceVal = parseFloat(globalTotalPrice.textContent) || 0;
+            animateValue(globalTotalPrice, oldPriceVal, stats.total_price, 800, true);
+
+            document.getElementById('statTotal').textContent = stats.total_count;
+            document.getElementById('statActive').textContent = stats.status_counts.active;
+            document.getElementById('statBroken').textContent = stats.status_counts.broken;
+            document.getElementById('statSold').textContent = stats.status_counts.sold;
+        } catch (e) {
+            console.error("加载统计数据失败", e);
+        }
+    }
+
+    // --- History Logic (Optimized for Pagination) ---
+    async function loadHistory(page = 1, append = false) {
+        if (isLoadingRecords) return;
+        isLoadingRecords = true;
+
+        try {
+            const sortByMap = { 'default': 'created_at', 'priceDesc': 'price' };
+            const sortBy = sortByMap[sortSelect.value] || 'created_at';
+            const sortOrder = sortSelect.value.toLowerCase().includes('asc') ? 'ASC' : 'DESC';
+            const query = (searchInput.value || '').trim();
+            const filter = filterSelect.value;
+
+            const res = await fetch(`/api/records?page=${page}&limit=${itemsPerPage}&sortBy=${sortBy}&sortOrder=${sortOrder}&q=${encodeURIComponent(query)}&status=${filter}`, {
+                headers: getHeaders()
+            });
+
             if (res.status === 401 || res.status === 403) {
                 return logoutBtn.click();
             }
-            globalRecords = await res.json();
+
+            const result = await res.json();
+            const newRecords = result.data || [];
+
+            if (append) {
+                globalRecords = [...globalRecords, ...newRecords];
+            } else {
+                globalRecords = newRecords;
+                // Reset scroll to top on new search/filter
+                document.getElementById('historyListScroll').scrollTop = 0;
+            }
+
+            currentPage = result.page;
+            hasMoreRecords = result.hasMore;
+
+            const loadingIndicator = document.getElementById('loadingIndicator');
+            if (loadingIndicator) {
+                if (hasMoreRecords) {
+                    loadingIndicator.classList.remove('hidden');
+                } else {
+                    loadingIndicator.classList.add('hidden');
+                }
+            }
+
             updateParentDropdowns();
             renderHistory();
         } catch (e) {
             console.error("加载历史记录失败", e);
+        } finally {
+            isLoadingRecords = false;
         }
     }
 
-    filterSelect.addEventListener('change', () => renderHistory());
-    sortSelect.addEventListener('change', () => renderHistory());
-    searchInput.addEventListener('input', () => renderHistory());
+    // Infinite Scroll Listener
+    const scrollContainer = document.getElementById('historyListScroll');
+    if (scrollContainer) {
+        scrollContainer.addEventListener('scroll', () => {
+            if (!hasMoreRecords || isLoadingRecords) return;
+
+            const { scrollTop, scrollHeight, clientHeight } = scrollContainer;
+            // Trigger 200px before bottom
+            if (scrollTop + clientHeight >= scrollHeight - 200) {
+                loadHistory(currentPage + 1, true);
+            }
+        });
+    }
+
+    filterSelect.addEventListener('change', () => {
+        currentPage = 1;
+        loadHistory(1, false);
+    });
+    sortSelect.addEventListener('change', () => {
+        currentPage = 1;
+        loadHistory(1, false);
+    });
+    searchInput.addEventListener('input', () => {
+        // Search still happens locally for now for responsiveness, 
+        // but we could move it to server if needed. 
+        // For infinite scroll, server-side search is better.
+        currentPage = 1;
+        loadHistory(1, false);
+    });
 
     window.toggleChildren = function (parentId) {
         expandedParents[parentId] = !expandedParents[parentId];
@@ -649,58 +755,16 @@ document.addEventListener('DOMContentLoaded', () => {
             globalStatsBox.classList.remove('hidden');
         }
 
-        let totalGlobalDailyCost = 0;
-        let totalGlobalPrice = 0;
-
-        let countActive = 0;
-        let countBroken = 0;
-        let countSold = 0;
-        let countTotal = globalRecords.length;
-
-        // 1. Calculate individual standard costs
-        // IMPORTANT: We must deep/shallow clone each record.
-        // Otherwise, setting parent.price = aggPrice below will mutate the global truth
-        // and cause prices to explode upon re-sorting.
         const processedRecords = globalRecords.map(r => {
             const clone = { ...r };
             const costs = calculateCost(clone);
             clone._dailyCost = costs.dailyCost;
             clone._days = costs.actualDaysForCalc;
             clone._finalCost = costs.finalCost;
-            totalGlobalDailyCost += clone._dailyCost;
-            totalGlobalPrice += clone.price;
-
-            const status = clone.status || 'active';
-            if (status === 'active') countActive++;
-            else if (status === 'broken') countBroken++;
-            else if (status === 'sold') countSold++;
-
             return clone;
         });
 
-        if (globalStatsBox) {
-            globalStatsBox.classList.remove('hidden');
-
-            // To make it look dynamic without crashing context heavily, use simple assignment
-            const oldDailyVal = parseFloat(globalTotalDaily.textContent) || 0;
-            if (oldDailyVal !== totalGlobalDailyCost && globalTotalDaily) {
-                animateValue(globalTotalDaily, oldDailyVal, totalGlobalDailyCost, 800, true);
-            }
-
-            if (globalTotalPrice) {
-                const oldPriceVal = parseFloat(globalTotalPrice.textContent) || 0;
-                if (oldPriceVal !== totalGlobalPrice) {
-                    animateValue(globalTotalPrice, oldPriceVal, totalGlobalPrice, 800, true);
-                }
-            }
-
-            document.getElementById('statTotal').textContent = countTotal;
-            document.getElementById('statActive').textContent = countActive;
-            document.getElementById('statBroken').textContent = countBroken;
-            document.getElementById('statSold').textContent = countSold;
-        }
-
-        // 2. Separate into parents and children
+        // 2. Separate into parents and children (Still needed for tree rendering)
         const childrenMap = {}; // parent_id -> array of children
         const topLevelRecords = [];
 
@@ -738,34 +802,18 @@ document.addEventListener('DOMContentLoaded', () => {
             parent._days = aggMaxDays;
         });
 
-        // 4. Apply Advanced Tree Filtering (Text + Status)
-        const query = (searchInput.value || '').trim().toLowerCase();
-        const filterMode = filterSelect.value;
-
-        function passesCriteria(r) {
-            const matchesSearch = query ? r.item_name.toLowerCase().includes(query) : true;
-            const matchesStatus = filterMode !== 'all' ? (r.status || 'active') === filterMode : true;
-            return matchesSearch && matchesStatus;
-        }
+        // 4. Apply Advanced Tree Filtering - Removed (Moved to Server)
 
         let sortedRecords = [];
         const filteredChildrenMap = {}; // We will only render children inside this map!
 
         topLevelRecords.forEach(parent => {
-            const parentMatchesTextAndStatus = passesCriteria(parent);
             const allChildren = childrenMap[parent.id] || [];
-            let validChildren = allChildren.filter(child => passesCriteria(child));
 
-            // If the parent strictly matches BOTH query and status, pull in ALL of its children that match the STATUS (ignoring text query for them).
-            if (parentMatchesTextAndStatus) {
-                validChildren = allChildren.filter(child => filterMode !== 'all' ? (child.status || 'active') === filterMode : true);
-            }
-
-            // We keep the parent IF it matches directly OR if it has ANY valid children to show
-            if (parentMatchesTextAndStatus || validChildren.length > 0) {
-                sortedRecords.push(parent);
-                filteredChildrenMap[parent.id] = validChildren;
-            }
+            // In pagination mode, we assume server returned everything matching the current filter.
+            // We only keep the parent if it's top-level. 
+            sortedRecords.push(parent);
+            filteredChildrenMap[parent.id] = allChildren;
         });
 
         // 5. Sorting
@@ -788,27 +836,27 @@ document.addEventListener('DOMContentLoaded', () => {
             virtualRows.push('<div class="clusterize-no-data" style="text-align:center; color:#94a3b8; padding: 20px;">没有符合条件的记录</div>');
         } else {
             sortedRecords.forEach(record => {
-            const children = filteredChildrenMap[record.id] || [];
-            if (children.length > 0) children.sort(sortFn);
+                const children = filteredChildrenMap[record.id] || [];
+                if (children.length > 0) children.sort(sortFn);
 
-            // Push parent row
-            virtualRows.push(`<div class="record-wrapper">${createItemHtml(record, false)}</div>`);
+                // Push parent row
+                virtualRows.push(`<div class="record-wrapper">${createItemHtml(record, false)}</div>`);
 
-            // Check if children exist and if they are expanded
-            if (children.length > 0) {
-                const totalChildren = children.length;
-                const isExpanded = !!expandedParents[record.id];
-                const btnText = isExpanded ? `▲ 收起零件明细` : `▼ 展开零件明细 (${totalChildren}个部件)`;
-                
-                virtualRows.push(`<div class="record-wrapper"><button class="toggle-children-btn" style="width:100%; border-radius:10px; margin-top:5px; margin-bottom:5px;" onclick="toggleChildren(${record.id})">${btnText}</button></div>`);
-                
-                if (isExpanded) {
-                    children.forEach(child => {
-                        virtualRows.push(`<div class="record-wrapper children-container show" style="padding-left:15px; border-left:3px solid var(--primary); margin-left:10px;">${createItemHtml(child, true)}</div>`);
-                    });
+                // Check if children exist and if they are expanded
+                if (children.length > 0) {
+                    const totalChildren = children.length;
+                    const isExpanded = !!expandedParents[record.id];
+                    const btnText = isExpanded ? `▲ 收起零件明细` : `▼ 展开零件明细 (${totalChildren}个部件)`;
+
+                    virtualRows.push(`<div class="record-wrapper"><button class="toggle-children-btn" style="width:100%; border-radius:10px; margin-top:5px; margin-bottom:5px;" onclick="toggleChildren(${record.id})">${btnText}</button></div>`);
+
+                    if (isExpanded) {
+                        children.forEach(child => {
+                            virtualRows.push(`<div class="record-wrapper children-container show" style="padding-left:15px; border-left:3px solid var(--primary); margin-left:10px;">${createItemHtml(child, true)}</div>`);
+                        });
+                    }
                 }
-            }
-        });
+            });
         }
         if (!clusterizeInstance) {
             clusterizeInstance = new Clusterize({
@@ -819,7 +867,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     clusterChanged: () => {
                         // Bind tooltips after new cluster renders
                         const scrollEl = document.getElementById('historyListScroll');
-                        if(scrollEl) {
+                        if (scrollEl) {
                             scrollEl.querySelectorAll('[data-fulltext]').forEach(el => {
                                 bindTooltip(el, el.dataset.fulltext);
                             });
@@ -831,23 +879,23 @@ document.addEventListener('DOMContentLoaded', () => {
             clusterizeInstance.update(virtualRows);
         }
 
-        // 7. Render Visualization Chart
+        // 7. Render Visualization Charts
         renderChart(processedRecords);
-        renderTrendChart(globalRecords);
+        renderTrendChart(currentTrendRange);
     }
 
     function renderChart(processedRecords) {
         const ctx = document.getElementById('costChart');
         if (!ctx) return;
-        
+
         const chartTitle = document.getElementById('chartTitle');
         const chartBackBtn = document.getElementById('chartBackBtn');
 
         let dataToShow = [];
-        
+
         if (!chartCurrentParentId) {
             if (chartBackBtn) chartBackBtn.classList.add('hidden');
-            if (chartTitle) chartTitle.innerText = "综合总览：前 5 大消费本体";
+            if (chartTitle) chartTitle.innerText = "前5大消费本体";
 
             const topLevelMap = {};
             processedRecords.forEach(r => {
@@ -861,7 +909,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (chartBackBtn) chartBackBtn.classList.remove('hidden');
             const parent = processedRecords.find(r => r.id === chartCurrentParentId);
             if (chartTitle) chartTitle.innerText = parent ? `拆解: ${parent.item_name}` : '子项分布';
-            
+
             // Do not show the parent itself, only children
             processedRecords.filter(r => r.parent_id === chartCurrentParentId).forEach(c => {
                 dataToShow.push({ ...c, _aggDailyCost: c._dailyCost });
@@ -869,7 +917,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         const sortedForChart = dataToShow.sort((a, b) => b._aggDailyCost - a._aggDailyCost);
-        
+
         let labels = [];
         let data = [];
         let otherCost = 0;
@@ -877,7 +925,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         sortedForChart.forEach((item, index) => {
             if (item._aggDailyCost <= 0) return;
-            
+
             if (index < 5) {
                 labels.push(item.item_name);
                 data.push(item._aggDailyCost.toFixed(2));
@@ -939,7 +987,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     legend: { position: 'right', labels: { color: '#cbd5e1', font: { size: 11 } } },
                     tooltip: {
                         callbacks: {
-                            label: function(context) { return ' ￥' + context.parsed + ' / 天'; }
+                            label: function (context) { return ' ￥' + context.parsed + ' / 天'; }
                         }
                     }
                 },
@@ -948,116 +996,90 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    function simulateCostAtDate(record, targetDate) {
-        const purchaseDate = new Date(record.purchase_date);
-        purchaseDate.setHours(0, 0, 0, 0);
-        
-        if (targetDate < purchaseDate) return 0;
-
-        let endDate = new Date(targetDate.getTime());
-        const status = record.status || 'active';
-        let finalCost = record.price;
-
-        if (status !== 'active' && record.end_date) {
-            const itemEndDate = new Date(record.end_date);
-            itemEndDate.setHours(0, 0, 0, 0);
-
-            if (targetDate >= itemEndDate) {
-                endDate = itemEndDate; // Status resolved by this date
-                if (status === 'sold') {
-                    finalCost = Math.max(0, record.price - (record.resale_price || 0));
-                }
-            }
-        }
-
-        const timeDiff = Math.max(0, endDate.getTime() - purchaseDate.getTime());
-        let daysUsed = Math.floor(timeDiff / (1000 * 3600 * 24));
-        const actualDaysForCalc = daysUsed + 1;
-
-        return finalCost / actualDaysForCalc;
-    }
-
-    function renderTrendChart(records) {
+    async function renderTrendChart(range = '30d') {
         const ctx = document.getElementById('trendChart');
         if (!ctx) return;
 
-        // Sample every 7 days over the last ~6 months (26 points)
-        const points = [];
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
+        currentTrendRange = range;
 
-        for (let i = 25; i >= 0; i--) {
-            const d = new Date(today.getTime());
-            d.setDate(d.getDate() - i * 7);
-            points.push(d);
-        }
-
-        const labels = points.map(d => `${d.getMonth() + 1}/${d.getDate()}`);
-        const data = points.map(bgDate => {
-            let sum = 0;
-            records.forEach(r => {
-                sum += simulateCostAtDate(r, bgDate);
-            });
-            return sum.toFixed(2);
-        });
-
-        if (trendChartInstance) {
-            trendChartInstance.destroy();
-        }
-
-        if (records.length === 0) {
-            ctx.classList.add('hidden');
-            return;
-        } else {
-            ctx.classList.remove('hidden');
-        }
-
-        trendChartInstance = new Chart(ctx, {
-            type: 'line',
-            data: {
-                labels: labels,
-                datasets: [{
-                    label: '系统总日均耗散 (元)',
-                    data: data,
-                    borderColor: 'rgba(96, 165, 250, 1)', // Light blue
-                    backgroundColor: 'rgba(96, 165, 250, 0.1)',
-                    borderWidth: 2,
-                    pointBackgroundColor: 'rgba(15, 23, 42, 1)',
-                    pointBorderColor: 'rgba(96, 165, 250, 1)',
-                    pointHoverBackgroundColor: 'rgba(96, 165, 250, 1)',
-                    fill: true,
-                    tension: 0.4
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: {
-                        display: false
-                    },
-                    tooltip: {
-                        callbacks: {
-                            label: function(context) {
-                                return ' ¥' + context.parsed.y + ' / 天';
-                            }
-                        }
-                    }
-                },
-                scales: {
-                    x: {
-                        grid: { display: false, color: 'rgba(255, 255, 255, 0.05)' },
-                        ticks: { color: '#94a3b8', maxTicksLimit: 8 }
-                    },
-                    y: {
-                        grid: { color: 'rgba(255, 255, 255, 0.05)' },
-                        ticks: { color: '#94a3b8' },
-                        beginAtZero: true
-                    }
-                }
+        // Update UI buttons
+        document.querySelectorAll('.trend-btn').forEach(btn => {
+            if (btn.getAttribute('data-range') === range) {
+                btn.classList.add('active');
+            } else {
+                btn.classList.remove('active');
             }
         });
+
+        try {
+            const res = await fetch(`/api/stats/trend?range=${range}`, { headers: getHeaders() });
+            if (!res.ok) return;
+            const trendData = await res.json();
+
+            if (trendChartInstance) {
+                trendChartInstance.destroy();
+            }
+
+            if (!trendData.data || trendData.data.length === 0) {
+                ctx.classList.add('hidden');
+                return;
+            } else {
+                ctx.classList.remove('hidden');
+            }
+
+            trendChartInstance = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: trendData.labels,
+                    datasets: [{
+                        label: '系统总日均耗散 (元)',
+                        data: trendData.data,
+                        borderColor: 'rgba(96, 165, 250, 1)',
+                        backgroundColor: 'rgba(96, 165, 250, 0.1)',
+                        borderWidth: 2,
+                        pointBackgroundColor: 'rgba(15, 23, 42, 1)',
+                        pointBorderColor: 'rgba(96, 165, 250, 1)',
+                        pointHoverBackgroundColor: 'rgba(96, 165, 250, 1)',
+                        fill: true,
+                        tension: 0.4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                label: function (context) { return ' ¥' + context.parsed.y + ' / 天'; }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            grid: { display: false, color: 'rgba(255, 255, 255, 0.05)' },
+                            ticks: { color: '#94a3b8', maxTicksLimit: 8 }
+                        },
+                        y: {
+                            grid: { color: 'rgba(255, 255, 255, 0.05)' },
+                            ticks: { color: '#94a3b8' },
+                            beginAtZero: true
+                        }
+                    }
+                }
+            });
+        } catch (e) {
+            console.error("加载趋势图失败", e);
+        }
     }
+
+    // Bind Trend Controls
+    document.querySelectorAll('.trend-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const range = btn.getAttribute('data-range');
+            renderTrendChart(range);
+        });
+    });
 
     // --- Animation ---
     function animateValue(obj, start, end, duration, isCurrency) {
@@ -1290,7 +1312,8 @@ document.addEventListener('DOMContentLoaded', () => {
             if (res.ok) {
                 showAppAlert('记录已还原到主页', 'success');
                 loadTrash();
-                loadHistory(); 
+                loadHistory();
+                loadStats();
             } else {
                 showAppAlert(data.error || '还原失败：记录可能已过期');
             }

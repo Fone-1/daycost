@@ -21,6 +21,10 @@ const db = new sqlite3.Database(DB_PATH, (err) => {
         console.error('Error opening database', err.message);
     } else {
         console.log('Connected to SQLite database.');
+        
+        // --- PERFORMANCE: Enable WAL Mode ---
+        db.run('PRAGMA journal_mode = WAL');
+
         // Initialize tables
         db.serialize(() => {
             db.run(`CREATE TABLE IF NOT EXISTS users (
@@ -40,16 +44,29 @@ const db = new sqlite3.Database(DB_PATH, (err) => {
                 FOREIGN KEY (user_id) REFERENCES users(id)
             )`);
 
-            // Safe Migrations (Errors ignored if columns already exist)
+            // Safe Migrations
             db.run("ALTER TABLE records ADD COLUMN status TEXT DEFAULT 'active'", (err) => { });
             db.run("ALTER TABLE records ADD COLUMN end_date TEXT", (err) => { });
             db.run("ALTER TABLE records ADD COLUMN resale_price REAL DEFAULT 0", (err) => { });
             db.run("ALTER TABLE records ADD COLUMN parent_id INTEGER DEFAULT NULL", (err) => { });
             db.run("ALTER TABLE records ADD COLUMN is_deleted INTEGER DEFAULT 0", (err) => { });
             db.run("ALTER TABLE records ADD COLUMN deleted_at DATETIME DEFAULT NULL", (err) => { });
+
+            // --- PERFORMANCE: Create Indexes ---
+            db.run("CREATE INDEX IF NOT EXISTS idx_records_user_list ON records(user_id, is_deleted, created_at)");
+            db.run("CREATE INDEX IF NOT EXISTS idx_records_parent ON records(parent_id)");
         });
     }
 });
+
+// --- BACKGROUND TASK: Auto-purge Recycle Bin entries older than 30 days ---
+setInterval(() => {
+    console.log('Running background auto-purge task...');
+    db.run(`DELETE FROM records WHERE is_deleted = 1 AND deleted_at < datetime('now', '-30 days')`, (err) => {
+        if (err) console.error('Background auto-purge failed', err);
+        else console.log('Background auto-purge completed.');
+    });
+}, 3600000); // Once every hour
 
 // Auth Middleware
 const authenticateToken = (req, res, next) => {
@@ -135,11 +152,101 @@ app.put('/api/auth/password', authenticateToken, (req, res) => {
 
 // --- RECORDS APIs ---
 
-// Get User Records (Active)
+// Get User Records (Active) with Pagination and Sorting
 app.get('/api/records', authenticateToken, (req, res) => {
-    db.all(`SELECT * FROM records WHERE user_id = ? AND is_deleted = 0 ORDER BY created_at DESC`, [req.user.id], (err, rows) => {
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 50;
+    const offset = (page - 1) * limit;
+    const sortBy = req.query.sortBy || 'created_at';
+    const sortOrder = req.query.sortOrder || 'DESC';
+    const searchQuery = req.query.q ? `%${req.query.q}%` : null;
+    const statusFilter = req.query.status && req.query.status !== 'all' ? req.query.status : null;
+
+    // Whitelist valid columns for sorting
+    const validSortColumns = ['created_at', 'price', 'item_name', 'purchase_date'];
+    const actualSortBy = validSortColumns.includes(sortBy) ? sortBy : 'created_at';
+    const actualSortOrder = sortOrder.toUpperCase() === 'ASC' ? 'ASC' : 'DESC';
+
+    let sqlCount = `SELECT COUNT(*) as total FROM records WHERE user_id = ? AND is_deleted = 0`;
+    let sqlData = `SELECT * FROM records WHERE user_id = ? AND is_deleted = 0`;
+    let params = [req.user.id];
+
+    if (searchQuery) {
+        sqlCount += ` AND item_name LIKE ?`;
+        sqlData += ` AND item_name LIKE ?`;
+        params.push(searchQuery);
+    }
+    
+    if (statusFilter) {
+        sqlCount += ` AND status = ?`;
+        sqlData += ` AND status = ?`;
+        params.push(statusFilter);
+    }
+
+    sqlData += ` ORDER BY ${actualSortBy} ${actualSortOrder} LIMIT ? OFFSET ?`;
+
+    db.get(sqlCount, params, (err, countRow) => {
         if (err) return res.status(500).json({ error: '查询失败' });
-        res.json(rows);
+        const total = countRow.total;
+
+        const dataParams = [...params, limit, offset];
+        db.all(sqlData, dataParams, (err, rows) => {
+                if (err) return res.status(500).json({ error: '查询失败' });
+                res.json({
+                    total,
+                    page,
+                    limit,
+                    hasMore: offset + rows.length < total,
+                    data: rows
+                });
+            }
+        );
+    });
+});
+
+// New API: Get Aggregated Stats (Backend calculation)
+app.get('/api/stats', authenticateToken, (req, res) => {
+    const userId = req.user.id;
+
+    const sqlStats = `
+        SELECT 
+            SUM(CASE 
+                WHEN status = 'active' OR status IS NULL THEN price / (julianday('now') - julianday(purchase_date) + 1)
+                WHEN status = 'broken' THEN price / (julianday(end_date) - julianday(purchase_date) + 1)
+                WHEN status = 'sold' THEN (price - resale_price) / (julianday(end_date) - julianday(purchase_date) + 1)
+                ELSE 0 
+            END) as total_daily_cost,
+            SUM(price) as total_price,
+            COUNT(*) as total_count
+        FROM records 
+        WHERE user_id = ? AND is_deleted = 0
+    `;
+
+    const sqlStatusCounts = `
+        SELECT status, COUNT(*) as count 
+        FROM records 
+        WHERE user_id = ? AND is_deleted = 0 
+        GROUP BY status
+    `;
+
+    db.get(sqlStats, [userId], (err, statsRow) => {
+        if (err) return res.status(500).json({ error: '统计计算失败' });
+
+        db.all(sqlStatusCounts, [userId], (err, statusRows) => {
+            if (err) return res.status(500).json({ error: '状态统计失败' });
+
+            const statusCounts = { active: 0, broken: 0, sold: 0 };
+            statusRows.forEach(row => {
+                if (row.status) statusCounts[row.status] = row.count;
+            });
+
+            res.json({
+                total_daily_cost: statsRow.total_daily_cost || 0,
+                total_price: statsRow.total_price || 0,
+                total_count: statsRow.total_count || 0,
+                status_counts: statusCounts
+            });
+        });
     });
 });
 
@@ -177,14 +284,9 @@ app.delete('/api/records/:id', authenticateToken, (req, res) => {
 
 // Get Trash Records (Deleted)
 app.get('/api/records/trash', authenticateToken, (req, res) => {
-    // Auto-purge records older than 30 days
-    db.run(`DELETE FROM records WHERE is_deleted = 1 AND deleted_at < datetime('now', '-30 days') AND user_id = ?`, [req.user.id], (err) => {
-        if (err) console.error('Auto purge failed', err);
-        
-        db.all(`SELECT * FROM records WHERE user_id = ? AND is_deleted = 1 ORDER BY deleted_at DESC`, [req.user.id], (err, rows) => {
-            if (err) return res.status(500).json({ error: '查询废纸篓失败' });
-            res.json(rows);
-        });
+    db.all(`SELECT * FROM records WHERE user_id = ? AND is_deleted = 1 ORDER BY deleted_at DESC`, [req.user.id], (err, rows) => {
+        if (err) return res.status(500).json({ error: '查询废纸篓失败' });
+        res.json(rows);
     });
 });
 
@@ -213,6 +315,84 @@ app.delete('/api/records/purge/:id', authenticateToken, (req, res) => {
         if (this.changes === 0) return res.status(404).json({ error: '记录不存在' });
         res.json({ message: '记录已永久销毁' });
     });
+});
+
+// New API: Get Trend Data (Backend calculation)
+app.get('/api/stats/trend', authenticateToken, (req, res) => {
+    const userId = req.user.id;
+    const range = req.query.range || '30d';
+
+    db.all(`SELECT * FROM records WHERE user_id = ? AND is_deleted = 0`, [userId], (err, records) => {
+        if (err) return res.status(500).json({ error: '获取趋势数据失败' });
+
+        const now = new Date();
+        now.setHours(0, 0, 0, 0);
+        let points = [];
+        let labels = [];
+        let count = 0;
+        let stepDays = 1;
+
+        if (range === '7d') {
+            count = 7;
+            stepDays = 1;
+        } else if (range === '30d') {
+            count = 10;
+            stepDays = 3;
+        } else if (range === '1y') {
+            count = 12;
+            stepDays = 30;
+        } else {
+            count = 10;
+            stepDays = 3;
+        }
+
+        for (let i = count - 1; i >= 0; i--) {
+            const d = new Date(now.getTime());
+            d.setDate(d.getDate() - i * stepDays);
+            
+            const dateStr = (range === '1y') ? 
+                `${d.getFullYear()}-${(d.getMonth() + 1).toString().padStart(2, '0')}` : 
+                `${(d.getMonth() + 1)}/${d.getDate()}`;
+            labels.push(dateStr);
+
+            let daySum = 0;
+            records.forEach(record => {
+                daySum += simulateCostAtDate(record, d);
+            });
+            points.push(daySum.toFixed(2));
+        }
+
+        res.json({ labels, data: points });
+    });
+
+    function simulateCostAtDate(record, targetDate) {
+        const purchaseDate = new Date(record.purchase_date);
+        purchaseDate.setHours(0, 0, 0, 0);
+        
+        if (targetDate < purchaseDate) return 0;
+
+        let endDate = new Date(targetDate.getTime());
+        const status = record.status || 'active';
+        let finalCost = record.price;
+
+        if (status !== 'active' && record.end_date) {
+            const itemEndDate = new Date(record.end_date);
+            itemEndDate.setHours(0, 0, 0, 0);
+
+            if (targetDate >= itemEndDate) {
+                endDate = itemEndDate;
+                if (status === 'sold') {
+                    finalCost = Math.max(0, record.price - (record.resale_price || 0));
+                }
+            }
+        }
+
+        const timeDiff = Math.max(0, endDate.getTime() - purchaseDate.getTime());
+        let daysUsed = Math.floor(timeDiff / (1000 * 3600 * 24));
+        const actualDaysForCalc = daysUsed + 1;
+
+        return finalCost / actualDaysForCalc;
+    }
 });
 
 // Update Record (Full Edit)

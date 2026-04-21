@@ -126,6 +126,9 @@
                         <div id="historyListContent" class="clusterize-content">
                             <!-- Rows go here -->
                         </div>
+                        <div id="loadingIndicator" class="hidden" style="text-align:center; padding:15px; color:#94a3b8; font-size:0.9rem;">
+                            加载中...
+                        </div>
                     </div>
                 </div>
             </main>
@@ -136,51 +139,61 @@
 
             <div class="stats-grid">
                 
-                <!-- Main Stats Card -->
-                <div id="globalStatsBox" class="card glass stats-main-card">
-                    <div class="stats-numbers">
-                        <div class="stat-block">
-                            <span class="stat-label">每日系统级账面总耗散</span>
-                            <div class="stat-value-large">¥<span id="globalTotalDaily">0.00</span><span class="stat-unit">/天</span></div>
+                <div class="stats-top-row">
+                    <!-- Main Stats Card -->
+                    <div id="globalStatsBox" class="card glass stats-main-card">
+                        <div class="stats-numbers">
+                            <div class="stat-block">
+                                <span class="stat-label">每日系统级账面总耗散</span>
+                                <div class="stat-value-large">¥<span id="globalTotalDaily">0.00</span><span class="stat-unit">/天</span></div>
+                            </div>
+                            <div class="stat-divider"></div>
+                            <div class="stat-block">
+                                <span class="stat-label">历史资金总投入额度</span>
+                                <div class="stat-value-medium">¥<span id="globalTotalPrice">0.00</span></div>
+                            </div>
                         </div>
-                        <div class="stat-divider"></div>
-                        <div class="stat-block">
-                            <span class="stat-label">历史资金总投入额度</span>
-                            <div class="stat-value-medium">¥<span id="globalTotalPrice">0.00</span></div>
+                        <div class="stats-badges">
+                            <div class="stat-badge">
+                                <span class="badge-num" id="statTotal">0</span>
+                                <span class="badge-label">总零件</span>
+                            </div>
+                            <div class="stat-badge active">
+                                <span class="badge-dot">🟢</span>
+                                <span class="badge-num" id="statActive">0</span>
+                                <span class="badge-label">正常运作</span>
+                            </div>
+                            <div class="stat-badge broken">
+                                <span class="badge-dot">🔴</span>
+                                <span class="badge-num" id="statBroken">0</span>
+                                <span class="badge-label">核心损毁</span>
+                            </div>
+                            <div class="stat-badge sold">
+                                <span class="badge-dot">🟡</span>
+                                <span class="badge-num" id="statSold">0</span>
+                                <span class="badge-label">闲置回血</span>
+                            </div>
                         </div>
                     </div>
-                    <div class="stats-badges">
-                        <div class="stat-badge">
-                            <span class="badge-num" id="statTotal">0</span>
-                            <span class="badge-label">总零件</span>
-                        </div>
-                        <div class="stat-badge active">
-                            <span class="badge-dot">🟢</span>
-                            <span class="badge-num" id="statActive">0</span>
-                            <span class="badge-label">正常运作</span>
-                        </div>
-                        <div class="stat-badge broken">
-                            <span class="badge-dot">🔴</span>
-                            <span class="badge-num" id="statBroken">0</span>
-                            <span class="badge-label">核心损毁</span>
-                        </div>
-                        <div class="stat-badge sold">
-                            <span class="badge-dot">🟡</span>
-                            <span class="badge-num" id="statSold">0</span>
-                            <span class="badge-label">闲置回血</span>
-                        </div>
-                    </div>
-                </div>
 
-                <div class="card glass stats-chart-card" style="position: relative;">
-                    <button id="chartBackBtn" class="btn hidden" style="position: absolute; top: 10px; left: 10px; padding: 4px 12px; font-size: 0.8rem; width: auto; margin: 0; background: rgba(59, 130, 246, 0.2); border: 1px solid rgba(59, 130, 246, 0.5); z-index: 10;">← 返回</button>
-                    <h3 id="chartTitle" style="position: absolute; top: 15px; left: 0; width: 100%; text-align: center; font-size: 0.85rem; color: #94a3b8; font-weight: normal; margin: 0; z-index: 5; pointer-events: none;">排名前5 - 综合耗散</h3>
-                    <canvas id="costChart"></canvas>
+                    <div class="card glass stats-chart-card" style="position: relative; flex: 1; display: flex; align-items: center; padding-left: 45px;">
+                        <button id="chartBackBtn" class="btn hidden" style="position: absolute; top: 10px; left: 10px; padding: 4px 12px; font-size: 0.8rem; width: auto; margin: 0; background: rgba(59, 130, 246, 0.2); border: 1px solid rgba(59, 130, 246, 0.5); z-index: 10;">← 返回</button>
+                        <h3 id="chartTitle" style="position: absolute; top: 50%; left: 15px; transform: translateY(-50%); width: auto; text-align: center; font-size: 0.75rem; color: #94a3b8; font-weight: normal; margin: 0; z-index: 5; pointer-events: none; writing-mode: vertical-rl; text-orientation: upright; letter-spacing: 2px; white-space: nowrap;">排名前5 - 综合耗散</h3>
+                        <canvas id="costChart"></canvas>
+                    </div>
                 </div>
 
                 <!-- Trend Chart (Full Width) -->
-                <div class="card glass stats-chart-card" style="grid-column: 1 / -1; min-height: 280px;">
-                    <canvas id="trendChart"></canvas>
+                <div class="card glass stats-chart-card" style="flex: 1; position: relative; display: flex; flex-direction: column; min-height: 200px;">
+                    <div class="trend-controls" style="position: absolute; top: 20px; right: 20px; z-index: 10;">
+                        <button class="trend-btn" data-range="7d">7天</button>
+                        <button class="trend-btn active" data-range="30d">30天</button>
+                        <button class="trend-btn" data-range="1y">1年</button>
+                    </div>
+                    
+                    <canvas id="trendChart" style="flex: 1; width: 100%;"></canvas>
+                    
+                    <h3 style="font-size: 0.85rem; color: #64748b; text-align: center; margin-top: 10px; font-weight: normal; width: 100%;">价值耗散趋势报告</h3>
                 </div>
             </div>
         </div>
