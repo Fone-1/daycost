@@ -1141,3 +1141,48 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 .stats-chart-card {
     padding: 1rem !important;
 }
+
+/* --- Mobile Responsive Rules --- */
+@media (max-width: 768px) {
+    /* Navigation Bar */
+    .nav-brand {
+        display: none; /* Hide brand text on mobile to save space */
+    }
+    .nav-btn-group {
+        padding-left: 0;
+        gap: 0.2rem;
+    }
+    .nav-btn {
+        padding: 0.4rem 0.6rem;
+        font-size: 0.75rem;
+    }
+
+    /* Stats Page Layout */
+    #pane-stats {
+        height: auto;
+        overflow-y: auto;
+    }
+    .stats-top-row {
+        flex-direction: column;
+    }
+    
+    /* Typography adjustments */
+    .stat-value-large {
+        font-size: 2rem;
+    }
+    .stat-value-medium {
+        font-size: 1.5rem;
+    }
+    .badge-num {
+        font-size: 1.2rem;
+    }
+
+    /* Form Layouts */
+    .history-header-filters {
+        flex-wrap: wrap;
+    }
+    .history-header-filters select, 
+    .history-header-filters input {
+        flex: 1 1 45%; /* Two columns for mobile filters */
+    }
+}

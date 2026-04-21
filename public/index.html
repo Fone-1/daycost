@@ -2,8 +2,17 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>日均成本计算器 (DayCost)</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>DayCost - 价值耗散监控器</title>
+    
+    <!-- PWA Settings -->
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#0f172a">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="DayCost">
+    <link rel="apple-touch-icon" href="/icon-512.png">
+    
     <link rel="stylesheet" href="style.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/clusterize.js/0.19.0/clusterize.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
@@ -191,7 +200,7 @@
                         <button class="trend-btn" data-range="1y">1年</button>
                     </div>
                     
-                    <canvas id="trendChart" style="flex: 1; width: 100%;"></canvas>
+                    <canvas id="trendChart" style="flex: 1; width: 100%; max-height: 220px;"></canvas>
                     
                     <h3 style="font-size: 0.85rem; color: #64748b; text-align: center; margin-top: 10px; font-weight: normal; width: 100%;">价值耗散趋势报告</h3>
                 </div>

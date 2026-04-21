@@ -1,3 +1,12 @@
+// --- PWA Service Worker Registration ---
+if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/sw.js')
+            .then(reg => console.log('ServiceWorker registered'))
+            .catch(err => console.log('ServiceWorker registration failed: ', err));
+    });
+}
+
 document.addEventListener('DOMContentLoaded', () => {
     // --- Tooltip System ---
     const tooltip = document.getElementById('globalTooltip');

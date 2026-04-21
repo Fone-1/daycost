@@ -1,0 +1,18 @@
+{
+  "name": "DayCost - 价值耗散监控器",
+  "short_name": "DayCost",
+  "description": "实时监控个人资产价值耗散与日均生命成本",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0f172a",
+  "theme_color": "#0f172a",
+  "icons": [
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
