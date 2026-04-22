@@ -60,6 +60,7 @@
                 <button class="nav-btn" data-target="pane-stats">📊 统计看板</button>
                 <button class="nav-btn" data-target="pane-trash">♻️ 废纸篓</button>
                 <button class="nav-btn" data-target="pane-settings">⚙️ 系统设置</button>
+                <button class="nav-btn hidden" id="navAdminBtn" data-target="pane-admin" style="background: rgba(239, 68, 68, 0.15); color: #fca5a5;">🛡️ 审计中心</button>
             </div>
             <div class="nav-brand">DayCost</div>
         </nav>
@@ -207,8 +208,9 @@
             </div>
         </div>
 
-        <!-- Pane: Settings -->
+            <!-- Pane: Settings -->
         <div id="pane-settings" class="spa-pane hidden">
+            <!-- Settings content below -->
             <header>
                 <h2>系统设置与数据中心</h2>
             </header>
@@ -263,6 +265,40 @@
                 </div>
             </div>
         </div>
+        
+        <!-- Pane: Admin -->
+        <div id="pane-admin" class="spa-pane hidden">
+            <header style="margin-bottom: 2rem;">
+                <h1 style="color: #ef4444; text-shadow: 0 0 15px rgba(239,68,68,0.4);">系统审计中心</h1>
+                <p>全局用户状态监控与管理视窗</p>
+            </header>
+            
+            <div class="card glass">
+                <h3 style="margin-bottom: 15px; display: flex; justify-content: space-between; align-items: center;">
+                    注册用户列表
+                    <button class="btn-small" onclick="loadAdminUsers()" style="background: rgba(255,255,255,0.1);">🔄 刷新数据</button>
+                </h3>
+                <div style="overflow-x: auto;">
+                    <table style="width: 100%; text-align: left; border-collapse: collapse; min-width: 600px;">
+                        <thead>
+                            <tr style="border-bottom: 1px solid rgba(255,255,255,0.1); color: #94a3b8;">
+                                <th style="padding: 10px;">ID</th>
+                                <th style="padding: 10px;">用户名</th>
+                                <th style="padding: 10px;">角色</th>
+                                <th style="padding: 10px;">注册时间</th>
+                                <th style="padding: 10px;">名下物品数</th>
+                                <th style="padding: 10px;">活跃系统耗散</th>
+                                <th style="padding: 10px; text-align: right;">操作</th>
+                            </tr>
+                        </thead>
+                        <tbody id="adminUsersList">
+                            <!-- Admin users handled by JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
     </div>
 
     <!-- Result Modal -->

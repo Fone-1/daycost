@@ -51,6 +51,9 @@ const db = new sqlite3.Database(DB_PATH, (err) => {
             db.run("ALTER TABLE records ADD COLUMN parent_id INTEGER DEFAULT NULL", (err) => { });
             db.run("ALTER TABLE records ADD COLUMN is_deleted INTEGER DEFAULT 0", (err) => { });
             db.run("ALTER TABLE records ADD COLUMN deleted_at DATETIME DEFAULT NULL", (err) => { });
+            
+            // User role migration
+            db.run("ALTER TABLE users ADD COLUMN role TEXT DEFAULT 'user'", (err) => { });
 
             // --- PERFORMANCE: Create Indexes ---
             db.run("CREATE INDEX IF NOT EXISTS idx_records_user_list ON records(user_id, is_deleted, created_at)");
@@ -82,6 +85,14 @@ const authenticateToken = (req, res, next) => {
     });
 };
 
+const requireAdmin = (req, res, next) => {
+    if (req.user && req.user.role === 'admin') {
+        next();
+    } else {
+        res.status(403).json({ error: '权限不足：仅管理员可执行此操作' });
+    }
+};
+
 // --- AUTH APIs ---
 
 // Register
@@ -91,14 +102,22 @@ app.post('/api/auth/register', async (req, res) => {
 
     try {
         const hashedPassword = await bcrypt.hash(password, 10);
-        db.run(`INSERT INTO users (username, password_hash) VALUES (?, ?)`, [username, hashedPassword], function (err) {
-            if (err) {
-                if (err.message.includes('UNIQUE')) {
-                    return res.status(400).json({ error: '用户名已存在' });
+        
+        // Genesis Admin mechanism
+        db.get(`SELECT COUNT(*) as count FROM users`, [], (err, row) => {
+            if (err) return res.status(500).json({ error: '系统内部状态检查失败' });
+            
+            const role = row.count === 0 ? 'admin' : 'user';
+            
+            db.run(`INSERT INTO users (username, password_hash, role) VALUES (?, ?, ?)`, [username, hashedPassword, role], function (err) {
+                if (err) {
+                    if (err.message.includes('UNIQUE')) {
+                        return res.status(400).json({ error: '用户名已存在' });
+                    }
+                    return res.status(500).json({ error: '注册失败' });
                 }
-                return res.status(500).json({ error: '注册失败' });
-            }
-            res.json({ message: '注册成功！请登录' });
+                res.json({ message: role === 'admin' ? '注册成功！你已自动成为首位超级管理员' : '注册成功！请登录' });
+            });
         });
     } catch (err) {
         res.status(500).json({ error: '服务器内部错误' });
@@ -115,8 +134,10 @@ app.post('/api/auth/login', (req, res) => {
 
         try {
             if (await bcrypt.compare(password, user.password_hash)) {
-                const token = jwt.sign({ id: user.id, username: user.username }, JWT_SECRET, { expiresIn: '7d' });
-                res.json({ token, username: user.username });
+                // Ensure legacy users without a role fall back to 'user' visually
+                const userRole = user.role || 'user'; 
+                const token = jwt.sign({ id: user.id, username: user.username, role: userRole }, JWT_SECRET, { expiresIn: '7d' });
+                res.json({ token, username: user.username, role: userRole });
             } else {
                 res.status(400).json({ error: '用户不存在或密码错误' });
             }
@@ -506,6 +527,59 @@ app.post('/api/records/import', authenticateToken, (req, res) => {
     });
 });
 
+
+
+// --- ADMIN APIs ---
+
+// Get Macro Users List
+app.get('/api/admin/users', authenticateToken, requireAdmin, (req, res) => {
+    const query = `
+        SELECT 
+            u.id, 
+            u.username, 
+            u.role, 
+            u.created_at,
+            COUNT(r.id) as total_items,
+            SUM(CASE WHEN r.is_deleted = 0 THEN r.price ELSE 0 END) as total_spent
+        FROM users u
+        LEFT JOIN records r ON u.id = r.user_id
+        GROUP BY u.id
+        ORDER BY u.created_at DESC
+    `;
+    db.all(query, [], (err, rows) => {
+        if (err) return res.status(500).json({ error: '无法获取全局用户画像' });
+        res.json({ data: rows });
+    });
+});
+
+// Purge User Data (Death Sentence)
+app.delete('/api/admin/user/:id', authenticateToken, requireAdmin, (req, res) => {
+    const targetUserId = req.params.id;
+    
+    // Prevent suicide
+    if (parseInt(targetUserId) === parseInt(req.user.id)) {
+        return res.status(400).json({ error: '操作驳回：你不能处决你自己' });
+    }
+
+    db.serialize(() => {
+        db.run("BEGIN TRANSACTION");
+        db.run("DELETE FROM records WHERE user_id = ?", [targetUserId], (err) => {
+            if (err) {
+                db.run("ROLLBACK");
+                return res.status(500).json({ error: '清理用户账单数据失败' });
+            }
+            db.run("DELETE FROM users WHERE id = ?", [targetUserId], function(err) {
+                if (err || this.changes === 0) {
+                    db.run("ROLLBACK");
+                    return res.status(500).json({ error: '铲除目标用户主体失败或用户不存在' });
+                }
+                db.run("COMMIT");
+                res.json({ message: '处决成功，关联记录已全线销毁。' });
+            });
+        });
+    });
+});
+
 // Catch-all route for sending index.html
 app.use((req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
@@ -513,5 +587,5 @@ app.use((req, res) => {
 
 // Start Server
 app.listen(PORT, () => {
-    console.log(`Server is running at http://localhost:${PORT}`);
+    console.log(`Server running on port ${PORT}`);
 });

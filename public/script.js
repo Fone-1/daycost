@@ -261,18 +261,34 @@ document.addEventListener('DOMContentLoaded', () => {
     logoutBtn.addEventListener('click', () => {
         localStorage.removeItem('daycost_token');
         localStorage.removeItem('daycost_username');
+        localStorage.removeItem('daycost_role');
         checkAuth();
     });
 
     function checkAuth() {
         const token = localStorage.getItem('daycost_token');
         const username = localStorage.getItem('daycost_username');
+        const role = localStorage.getItem('daycost_role');
         const globalStatsBox = document.getElementById('globalStatsBox');
+        const navAdminBtn = document.getElementById('navAdminBtn');
 
         if (token && username) {
             authSection.classList.add('hidden');
             dashboardSection.classList.remove('hidden');
             displayUsername.textContent = username;
+            
+            if (navAdminBtn) {
+                if (role === 'admin') {
+                    navAdminBtn.classList.remove('hidden');
+                } else {
+                    navAdminBtn.classList.add('hidden');
+                    // Safety UI check: if they are on the admin pane but not admin, kick them home
+                    if (document.getElementById('pane-admin') && !document.getElementById('pane-admin').classList.contains('hidden')) {
+                        document.querySelector('[data-target="pane-home"]').click();
+                    }
+                }
+            }
+
             loadHistory();
             loadStats();
         } else {
@@ -294,6 +310,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             localStorage.setItem('daycost_token', data.token);
             localStorage.setItem('daycost_username', data.username);
+            localStorage.setItem('daycost_role', data.role || 'user');
             checkAuth();
             passwordInput.value = '';
         } catch (err) {
@@ -739,15 +756,21 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         return `
-            <div class="history-item ${classModifiers}">
-                <div class="history-info">
-                    <span class="history-name" data-fulltext="${record.item_name}">${record.item_name} ${badges}</span>
-                    <span class="history-meta" data-fulltext="${metaHtml.replace(/￥/g, '\xA5')}">${metaHtml}</span>
-                </div>
-                <div class="history-cost">
-                    <div class="history-cost-val">￥${record._dailyCost.toFixed(2)}<span>/天</span></div>
-                    <button class="status-btn" onclick="openStatusModal(${record.id})" title="修改">⚙️</button>
-                    ${isChild ? '' : `<button class="delete-btn" onclick="deleteRecord(${record.id})" title="删除">🗑️</button>`}
+            <div class="history-item ${classModifiers}" data-id="${record.id}">
+                <div class="swipe-wrapper" ontouchstart="handleSwipeStart(event)" ontouchmove="handleSwipeMove(event)" ontouchend="handleSwipeEnd(event)">
+                    <div class="swipe-content">
+                        <div class="history-info">
+                            <span class="history-name" data-fulltext="${record.item_name}">${record.item_name} ${badges}</span>
+                            <span class="history-meta" data-fulltext="${metaHtml.replace(/￥/g, '\xA5')}">${metaHtml}</span>
+                        </div>
+                        <div class="history-cost">
+                            <div class="history-cost-val">￥${record._dailyCost.toFixed(2)}<span>/天</span></div>
+                        </div>
+                    </div>
+                    <div class="swipe-actions">
+                        <button class="status-btn" onclick="openStatusModal(${record.id})" title="修改">⚙️</button>
+                        ${isChild ? '' : `<button class="delete-btn" onclick="deleteRecord(${record.id})" title="删除">🗑️</button>`}
+                    </div>
                 </div>
             </div>
         `;
@@ -1349,4 +1372,140 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
     };
+    
+    // --- ADMIN DASHBOARD ---
+    
+    window.loadAdminUsers = async function() {
+        const tbody = document.getElementById('adminUsersList');
+        if (!tbody) return;
+        
+        tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; color: #94a3b8; padding: 20px;">数据加载中...</td></tr>';
+        
+        try {
+            const res = await fetch('/api/admin/users', { headers: getHeaders() });
+            const data = await res.json();
+            
+            if (!res.ok) throw new Error(data.error || '获取用户列表失败');
+            
+            if (!data.data || data.data.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; color: #94a3b8; padding: 20px;">暂无用户数据</td></tr>';
+                return;
+            }
+            
+            tbody.innerHTML = '';
+            
+            data.data.forEach(u => {
+                const tr = document.createElement('tr');
+                tr.style.borderBottom = '1px solid rgba(255,255,255,0.05)';
+                
+                const roleBadge = u.role === 'admin' 
+                    ? '<span style="background: rgba(239, 68, 68, 0.2); color: #ef4444; padding: 2px 8px; border-radius: 12px; font-size: 0.8rem;">管理员</span>'
+                    : '<span style="background: rgba(59, 130, 246, 0.2); color: #3b82f6; padding: 2px 8px; border-radius: 12px; font-size: 0.8rem;">普通用户</span>';
+                
+                const delBtn = u.role === 'admin' 
+                    ? '<span style="color: #64748b; font-size: 0.8rem;">不可处决</span>'
+                    : `<button onclick="deleteAdminUser(${u.id}, '${u.username}')" style="background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.5); color: #fca5a5; padding: 4px 10px; border-radius: 6px; cursor: pointer; transition: 0.2s;">处决</button>`;
+
+                tr.innerHTML = `
+                    <td style="padding: 12px 10px; color: #94a3b8;">#${u.id}</td>
+                    <td style="padding: 12px 10px; font-weight: 600;">${u.username}</td>
+                    <td style="padding: 12px 10px;">${roleBadge}</td>
+                    <td style="padding: 12px 10px; color: #94a3b8;">${new Date(u.created_at).toLocaleDateString()}</td>
+                    <td style="padding: 12px 10px; color: #f8fafc;">${u.total_items} 件</td>
+                    <td style="padding: 12px 10px; color: #10b981;">¥${(u.total_spent || 0).toFixed(2)}</td>
+                    <td style="padding: 12px 10px; text-align: right;">${delBtn}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        } catch (e) {
+            tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; color: #ef4444; padding: 20px;">${e.message}</td></tr>`;
+        }
+    };
+    
+    window.deleteAdminUser = function(id, username) {
+        showAppConfirm('处决确认', `确定要彻底歼灭用户 [${username}] 及其名下所有的消费记录吗？此操作属于物理删除，无法通过废纸篓还原！`, async () => {
+            try {
+                const res = await fetch(`/api/admin/user/${id}`, {
+                    method: 'DELETE',
+                    headers: getHeaders()
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error || '处决失败');
+                
+                showAppAlert(data.message, 'success');
+                loadAdminUsers();
+            } catch (err) {
+                showAppAlert(err.message, 'error');
+            }
+        }, '确认物理删除');
+    };
+    
+    // --- Mobile Swipe-to-Reveal Logic ---
+    let touchStartX = 0;
+    let swipeWrapper = null;
+    
+    window.handleSwipeStart = function(e) {
+        if(window.innerWidth > 799) return; // Only on mobile
+        const wrapper = e.currentTarget;
+        
+        // Auto-close other swiped items
+        document.querySelectorAll('.swipe-wrapper.swiped').forEach(w => {
+            if(w !== wrapper) {
+                w.style.transform = 'translateX(0)';
+                w.classList.remove('swiped');
+            }
+        });
+        
+        touchStartX = e.touches[0].clientX;
+        swipeWrapper = wrapper;
+        wrapper.style.transition = 'none'; // Instant follow finger
+    };
+
+    window.handleSwipeMove = function(e) {
+        if(!swipeWrapper || window.innerWidth > 799) return;
+        const currentX = e.touches[0].clientX;
+        const diff = currentX - touchStartX;
+        
+        if (diff < 0 && diff > -110) { // Drag left
+            swipeWrapper.style.transform = `translateX(${diff}px)`;
+            if (Math.abs(diff) > 15) { 
+                e.preventDefault(); // Stop vertical scroll if horizontal swipe detected
+            }
+        } else if (diff > 0 && swipeWrapper.classList.contains('swiped')) { // Drag right to close
+            const newPos = -100 + diff;
+            if (newPos <= 0) {
+                swipeWrapper.style.transform = `translateX(${newPos}px)`;
+            }
+        }
+    };
+
+    window.handleSwipeEnd = function(e) {
+        if(!swipeWrapper || window.innerWidth > 799) return;
+        swipeWrapper.style.transition = 'transform 0.3s cubic-bezier(0.1, 0.7, 0.1, 1)';
+        
+        const transformStr = swipeWrapper.style.transform;
+        let x = 0;
+        if(transformStr.includes('translateX')) {
+            x = parseInt(transformStr.replace('translateX(', '').replace('px)', ''));
+        }
+        
+        if (x < -40) { // If dragged left enough, snap open
+            swipeWrapper.style.transform = 'translateX(-100px)';
+            swipeWrapper.classList.add('swiped');
+        } else { // Snap back closed
+            swipeWrapper.style.transform = 'translateX(0)';
+            swipeWrapper.classList.remove('swiped');
+        }
+        swipeWrapper = null;
+    };
+    
+    // Bind the loadAdminUsers to the nav tap if that pane is opened
+    document.querySelectorAll('.nav-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            if (btn.getAttribute('data-target') === 'pane-admin') {
+                loadAdminUsers();
+            }
+        });
+    });
+
 });
