@@ -184,8 +184,26 @@ app.get('/api/records', authenticateToken, (req, res) => {
     const statusFilter = req.query.status && req.query.status !== 'all' ? req.query.status : null;
 
     // Whitelist valid columns for sorting
-    const validSortColumns = ['created_at', 'price', 'item_name', 'purchase_date'];
-    const actualSortBy = validSortColumns.includes(sortBy) ? sortBy : 'created_at';
+    let sqlSortExpression = 'created_at';
+    if (sortBy === 'price') sqlSortExpression = 'price';
+    else if (sortBy === 'item_name') sqlSortExpression = 'item_name';
+    else if (sortBy === 'purchase_date') sqlSortExpression = 'purchase_date';
+    else if (sortBy === 'dailyCost') {
+        sqlSortExpression = `(CASE 
+                WHEN status = 'active' OR status IS NULL THEN price / (julianday('now') - julianday(purchase_date) + 1)
+                WHEN status = 'broken' THEN price / (julianday(end_date) - julianday(purchase_date) + 1)
+                WHEN status = 'sold' THEN (price - resale_price) / (julianday(end_date) - julianday(purchase_date) + 1)
+                ELSE 0 
+            END)`;
+    } else if (sortBy === 'days') {
+        sqlSortExpression = `(CASE 
+                WHEN status = 'active' OR status IS NULL THEN (julianday('now') - julianday(purchase_date) + 1)
+                WHEN status = 'broken' THEN (julianday(end_date) - julianday(purchase_date) + 1)
+                WHEN status = 'sold' THEN (julianday(end_date) - julianday(purchase_date) + 1)
+                ELSE 0 
+            END)`;
+    }
+    
     const actualSortOrder = sortOrder.toUpperCase() === 'ASC' ? 'ASC' : 'DESC';
 
     let sqlCount = `SELECT COUNT(*) as total FROM records WHERE user_id = ? AND is_deleted = 0`;
@@ -204,7 +222,7 @@ app.get('/api/records', authenticateToken, (req, res) => {
         params.push(statusFilter);
     }
 
-    sqlData += ` ORDER BY ${actualSortBy} ${actualSortOrder} LIMIT ? OFFSET ?`;
+    sqlData += ` ORDER BY ${sqlSortExpression} ${actualSortOrder} LIMIT ? OFFSET ?`;
 
     db.get(sqlCount, params, (err, countRow) => {
         if (err) return res.status(500).json({ error: '查询失败' });

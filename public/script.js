@@ -657,7 +657,14 @@ document.addEventListener('DOMContentLoaded', () => {
         isLoadingRecords = true;
 
         try {
-            const sortByMap = { 'default': 'created_at', 'priceDesc': 'price' };
+            const sortByMap = { 
+                'default': 'created_at', 
+                'priceDesc': 'price',
+                'costDesc': 'dailyCost',
+                'costAsc': 'dailyCost',
+                'daysDesc': 'days',
+                'daysAsc': 'days'
+            };
             const sortBy = sortByMap[sortSelect.value] || 'created_at';
             const sortOrder = sortSelect.value.toLowerCase().includes('asc') ? 'ASC' : 'DESC';
             const query = (searchInput.value || '').trim();
@@ -802,8 +809,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
         processedRecords.forEach(r => {
             if (r.parent_id) {
-                if (!childrenMap[r.parent_id]) childrenMap[r.parent_id] = [];
-                childrenMap[r.parent_id].push(r);
+                // Check if the parent actually exists in the current filtered dataset
+                const hasParent = processedRecords.some(p => p.id === r.parent_id);
+                if (hasParent) {
+                    if (!childrenMap[r.parent_id]) childrenMap[r.parent_id] = [];
+                    childrenMap[r.parent_id].push(r);
+                } else {
+                    // Orphaned due to server-side filtering (e.g. parent is active, child is broken)
+                    // Promote to top level so it is visible
+                    topLevelRecords.push(r);
+                }
             } else {
                 topLevelRecords.push(r);
             }
