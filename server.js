@@ -54,6 +54,12 @@ const db = new sqlite3.Database(DB_PATH, (err) => {
             
             // User role migration
             db.run("ALTER TABLE users ADD COLUMN role TEXT DEFAULT 'user'", (err) => { });
+            // Tags migration
+            db.run("ALTER TABLE records ADD COLUMN tags TEXT DEFAULT ''", (err) => { });
+            // Depreciation migration
+            db.run("ALTER TABLE records ADD COLUMN depreciation_method TEXT DEFAULT 'straight_line'", (err) => { });
+            db.run("ALTER TABLE records ADD COLUMN expected_lifespan INTEGER DEFAULT 1095", (err) => { });
+            db.run("ALTER TABLE records ADD COLUMN expected_salvage REAL DEFAULT 0", (err) => { });
 
             // --- PERFORMANCE: Create Indexes ---
             db.run("CREATE INDEX IF NOT EXISTS idx_records_user_list ON records(user_id, is_deleted, created_at)");
@@ -279,11 +285,56 @@ app.get('/api/stats', authenticateToken, (req, res) => {
                 if (row.status) statusCounts[row.status] = row.count;
             });
 
-            res.json({
-                total_daily_cost: statsRow.total_daily_cost || 0,
-                total_price: statsRow.total_price || 0,
-                total_count: statsRow.total_count || 0,
-                status_counts: statusCounts
+            const sqlTags = `SELECT tags, price, purchase_date, status, end_date, resale_price FROM records WHERE user_id = ? AND is_deleted = 0 AND tags IS NOT NULL AND tags != ''`;
+            db.all(sqlTags, [userId], (err, tagRows) => {
+                if (err) return res.status(500).json({ error: '标签统计失败' });
+
+                const tagStats = {};
+                const now = new Date();
+                now.setHours(0, 0, 0, 0);
+
+                tagRows.forEach(row => {
+                    const purchaseDate = new Date(row.purchase_date);
+                    purchaseDate.setHours(0, 0, 0, 0);
+                    let endDate = new Date(now.getTime());
+                    const status = row.status || 'active';
+                    let finalCost = row.price;
+                    
+                    if (status !== 'active' && row.end_date) {
+                        const itemEndDate = new Date(row.end_date);
+                        itemEndDate.setHours(0, 0, 0, 0);
+                        if (now >= itemEndDate) {
+                            endDate = itemEndDate;
+                            if (status === 'sold') {
+                                finalCost = Math.max(0, row.price - (row.resale_price || 0));
+                            }
+                        }
+                    }
+                    
+                    const timeDiff = Math.max(0, endDate.getTime() - purchaseDate.getTime());
+                    const daysUsed = Math.floor(timeDiff / (1000 * 3600 * 24)) + 1;
+                    const dailyCost = finalCost / daysUsed;
+
+                    const tagsArr = row.tags.split(/[,，\s]+/).map(t => t.trim()).filter(t => t);
+                    
+                    tagsArr.forEach(t => {
+                        const cleanTag = t.startsWith('#') ? t.substring(1) : t;
+                        if (!cleanTag) return;
+                        if (!tagStats[cleanTag]) {
+                            tagStats[cleanTag] = { total_price: 0, daily_cost: 0 };
+                        }
+                        tagStats[cleanTag].total_price += row.price;
+                        tagStats[cleanTag].daily_cost += dailyCost;
+                    });
+                });
+
+                res.json({
+                    total_daily_cost: statsRow.total_daily_cost || 0,
+                    total_price: statsRow.total_price || 0,
+                    total_count: statsRow.total_count || 0,
+                    status_counts: statusCounts,
+                    tag_stats: tagStats
+                });
             });
         });
     });
@@ -291,13 +342,13 @@ app.get('/api/stats', authenticateToken, (req, res) => {
 
 // Add Record
 app.post('/api/records', authenticateToken, (req, res) => {
-    const { item_name, price, purchase_date, parent_id } = req.body;
+    const { item_name, price, purchase_date, parent_id, tags } = req.body;
 
     if (price == null || !purchase_date) return res.status(400).json({ error: '花费金额和购买日期必填' });
 
     db.run(
-        `INSERT INTO records (user_id, item_name, price, purchase_date, parent_id) VALUES (?, ?, ?, ?, ?)`,
-        [req.user.id, item_name, price, purchase_date, parent_id || null],
+        `INSERT INTO records (user_id, item_name, price, purchase_date, parent_id, tags) VALUES (?, ?, ?, ?, ?, ?)`,
+        [req.user.id, item_name, price, purchase_date, parent_id || null, tags || ''],
         function (err) {
             if (err) return res.status(500).json({ error: '保存失败' });
             res.json({ id: this.lastID, message: '记录已保存' });
@@ -434,10 +485,148 @@ app.get('/api/stats/trend', authenticateToken, (req, res) => {
     }
 });
 
+// New API: Get Pie Chart Data (Backend extraction)
+app.get('/api/stats/pie', authenticateToken, (req, res) => {
+    const userId = req.user.id;
+    const parentId = req.query.parent_id || null;
+
+    db.all(`SELECT id, item_name, price, purchase_date, status, end_date, resale_price, parent_id FROM records WHERE user_id = ? AND is_deleted = 0`, [userId], (err, records) => {
+        if (err) return res.status(500).json({ error: '获取图表数据失败' });
+
+        const now = new Date();
+        const recordsWithCost = records.map(record => {
+            const purchaseDate = new Date(record.purchase_date);
+            purchaseDate.setHours(0, 0, 0, 0);
+            
+            let endDate = new Date(now.getTime());
+            const status = record.status || 'active';
+            let finalCost = record.price;
+
+            if (status !== 'active' && record.end_date) {
+                const itemEndDate = new Date(record.end_date);
+                itemEndDate.setHours(0, 0, 0, 0);
+                if (now >= itemEndDate) {
+                    endDate = itemEndDate;
+                    if (status === 'sold') {
+                        finalCost = Math.max(0, record.price - (record.resale_price || 0));
+                    }
+                }
+            }
+            
+            const timeDiff = Math.max(0, endDate.getTime() - purchaseDate.getTime());
+            const daysUsed = Math.floor(timeDiff / (1000 * 3600 * 24)) + 1;
+            const dailyCost = finalCost / daysUsed;
+
+            return { ...record, _dailyCost: dailyCost };
+        });
+
+        let dataToShow = [];
+        let childrenCountMap = {};
+
+        recordsWithCost.forEach(r => {
+            if (r.parent_id) {
+                childrenCountMap[r.parent_id] = (childrenCountMap[r.parent_id] || 0) + 1;
+            }
+        });
+
+        if (!parentId) {
+            const topLevelMap = {};
+            const childrenMap = {};
+
+            recordsWithCost.forEach(r => {
+                if (r.parent_id) {
+                    if (!childrenMap[r.parent_id]) childrenMap[r.parent_id] = [];
+                    childrenMap[r.parent_id].push(r);
+                } else {
+                    topLevelMap[r.id] = { ...r, _aggDailyCost: r._dailyCost };
+                }
+            });
+
+            Object.values(topLevelMap).forEach(parent => {
+                const children = childrenMap[parent.id] || [];
+                children.forEach(child => {
+                    parent._aggDailyCost += child._dailyCost;
+                });
+            });
+
+            dataToShow = Object.values(topLevelMap);
+        } else {
+            const pid = parseInt(parentId);
+            dataToShow = recordsWithCost
+                .filter(r => r.parent_id === pid)
+                .map(c => ({ ...c, _aggDailyCost: c._dailyCost }));
+        }
+
+        const sortedForChart = dataToShow.sort((a, b) => b._aggDailyCost - a._aggDailyCost);
+
+        let labels = [];
+        let data = [];
+        let originalIds = [];
+        let hasChildrenArray = [];
+        let otherCost = 0;
+
+        sortedForChart.forEach((item, index) => {
+            if (item._aggDailyCost <= 0) return;
+
+            if (index < 5) {
+                labels.push(item.item_name);
+                data.push(item._aggDailyCost.toFixed(2));
+                originalIds.push(item.id);
+                hasChildrenArray.push(!!childrenCountMap[item.id]);
+            } else {
+                otherCost += item._aggDailyCost;
+            }
+        });
+
+        if (otherCost > 0) {
+            labels.push('其他项并集');
+            data.push(otherCost.toFixed(2));
+            originalIds.push(null);
+            hasChildrenArray.push(false);
+        }
+
+        let parentName = null;
+        if (parentId) {
+            const parent = records.find(r => r.id === parseInt(parentId));
+            if (parent) parentName = parent.item_name;
+        }
+
+        res.json({ labels, data, originalIds, hasChildrenArray, parentName });
+    });
+});
+
+app.post('/api/records', authenticateToken, (req, res) => {
+    const { item_name, price, purchase_date, status, end_date, resale_price, parent_id, tags, depreciation_method, expected_lifespan, expected_salvage } = req.body;
+
+    if (!item_name || price == null || !purchase_date) {
+        return res.status(400).json({ error: '请填写完整的物品名称、金额和买入日期' });
+    }
+
+    if (parent_id) {
+        db.get(`SELECT COUNT(*) as count FROM records WHERE id = ?`, [parent_id], (err, row) => {
+            if (!row || row.count === 0) return res.status(400).json({ error: '指定的组合本体不存在' });
+            executeInsert();
+        });
+    } else {
+        executeInsert();
+    }
+
+    function executeInsert() {
+        db.run(
+            `INSERT INTO records (user_id, item_name, price, purchase_date, status, end_date, resale_price, parent_id, tags, depreciation_method, expected_lifespan, expected_salvage) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [req.user.id, item_name, price, purchase_date, status || 'active', end_date || null, resale_price || 0, parent_id || null, tags || '', depreciation_method || 'straight_line', expected_lifespan || 1095, expected_salvage || 0],
+            function (err) {
+                if (err) return res.status(500).json({ error: '添加失败' });
+                res.json({ message: '添加成功', id: this.lastID });
+            }
+        );
+    }
+});
+
 // Update Record (Full Edit)
 app.put('/api/records/:id', authenticateToken, (req, res) => {
     const recordId = req.params.id;
-    const { item_name, price, purchase_date, status, end_date, resale_price, parent_id } = req.body;
+    const { item_name, price, purchase_date, status, end_date, resale_price, parent_id, tags, depreciation_method, expected_lifespan, expected_salvage } = req.body;
 
     if (!item_name || price == null || !purchase_date) {
         return res.status(400).json({ error: '请填写完整的物品名称、金额和买入日期' });
@@ -459,9 +648,9 @@ app.put('/api/records/:id', authenticateToken, (req, res) => {
 
     function executeUpdate() {
         db.run(
-            `UPDATE records SET item_name = ?, price = ?, purchase_date = ?, status = ?, end_date = ?, resale_price = ?, parent_id = ? WHERE id = ? AND user_id = ?`,
-            [item_name, price, purchase_date, status, end_date || null, resale_price || 0, parent_id || null, recordId, req.user.id],
-            function (err) {
+        `UPDATE records SET item_name = ?, price = ?, purchase_date = ?, status = ?, end_date = ?, resale_price = ?, parent_id = ?, tags = ?, depreciation_method = ?, expected_lifespan = ?, expected_salvage = ? WHERE id = ? AND user_id = ?`,
+        [item_name, price, purchase_date, status, end_date || null, resale_price || 0, parent_id || null, tags || '', depreciation_method || 'straight_line', expected_lifespan || 1095, expected_salvage || 0, recordId, req.user.id],
+        function (err) {
                 if (err) return res.status(500).json({ error: '更新失败' });
                 if (this.changes === 0) return res.status(404).json({ error: '记录不存在或无权限' });
                 res.json({ message: '记录已更新' });

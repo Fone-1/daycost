@@ -184,8 +184,8 @@ document.addEventListener('DOMContentLoaded', () => {
             // Hacky but simple: re-render the history view (which re-renders charts)
             const event = new Event('submit');
             if (globalRecords.length > 0) {
-                // Re-calculate simply by calling renderHistory again
-                renderHistory();
+                // Re-calculate simply by calling renderChart again
+                renderChart();
             }
         });
     }
@@ -417,6 +417,13 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
+    window.openDepreciationInfoModal = function() {
+        const modal = document.getElementById('depreciationInfoModal');
+        if (modal) {
+            modal.classList.remove('hidden');
+        }
+    };
+
     // --- Calculator Logic ---
     costForm.addEventListener('submit', async (e) => {
         e.preventDefault();
@@ -428,6 +435,10 @@ document.addEventListener('DOMContentLoaded', () => {
         const status = initialStatusSelect.value;
         const end_date = formEndDate.value || null;
         const resale_price = parseFloat(document.getElementById('formResalePrice').value) || 0;
+        const tags = document.getElementById('itemTags').value;
+        const depreciation_method = document.getElementById('formDepreciationMethod').value;
+        const expected_lifespan = parseInt(document.getElementById('formExpectedLifespan').value) || 1095;
+        const expected_salvage = parseFloat(document.getElementById('formExpectedSalvage').value) || 0;
 
         // Validate end_date when status requires it
         if (status === 'broken' || status === 'sold') {
@@ -460,7 +471,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const res = await fetch('/api/records', {
                 method: 'POST',
                 headers: getHeaders(),
-                body: JSON.stringify({ item_name: itemName, price, purchase_date: purchaseDateStr, parent_id, status, end_date, resale_price })
+                body: JSON.stringify({ item_name: itemName, price, purchase_date: purchaseDateStr, parent_id, status, end_date, resale_price, tags, depreciation_method, expected_lifespan, expected_salvage })
             });
             if (res.ok) {
                 costForm.reset();
@@ -469,6 +480,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 formResalePriceGroup.classList.add('hidden');
                 dateInput.max = todayStr;
                 dateInput.value = todayStr;
+                document.getElementById('addItemModal').classList.add('hidden');
                 loadHistory();
                 loadStats();
 
@@ -506,10 +518,32 @@ document.addEventListener('DOMContentLoaded', () => {
             finalCost = Math.max(0, record.price - (record.resale_price || 0));
         }
 
+        // --- Calculate Depreciation (Current Value) ---
+        let currentValue = record.price;
+        if (status === 'sold') {
+            currentValue = record.resale_price || 0;
+        } else if (status === 'broken') {
+            currentValue = 0;
+        } else {
+            const depMethod = record.depreciation_method || 'straight_line';
+            const lifespan = record.expected_lifespan || 1095;
+            const salvage = record.expected_salvage || 0;
+            
+            if (depMethod === 'straight_line') {
+                const dailyDep = (record.price - salvage) / lifespan;
+                currentValue = Math.max(salvage, record.price - (dailyDep * actualDaysForCalc));
+            } else if (depMethod === 'double_declining') {
+                const dailyRate = 2 / lifespan;
+                currentValue = record.price * Math.pow(1 - dailyRate, actualDaysForCalc);
+                currentValue = Math.max(salvage, currentValue);
+            }
+        }
+
         return {
             dailyCost: finalCost / actualDaysForCalc,
             actualDaysForCalc,
-            finalCost
+            finalCost,
+            currentValue
         };
     }
 
@@ -539,12 +573,16 @@ document.addEventListener('DOMContentLoaded', () => {
         const status = statusSelect.value;
         const end_date = statusEndDate.value;
         const resale_price = parseFloat(statusResalePrice.value) || 0;
+        const tags = document.getElementById('statusEditTags').value;
+        const depreciation_method = document.getElementById('statusEditDepreciationMethod').value;
+        const expected_lifespan = parseInt(document.getElementById('statusEditExpectedLifespan').value) || 1095;
+        const expected_salvage = parseFloat(document.getElementById('statusEditExpectedSalvage').value) || 0;
 
         try {
             const res = await fetch(`/api/records/${id}`, {
                 method: 'PUT',
                 headers: getHeaders(),
-                body: JSON.stringify({ item_name, price, purchase_date, status, end_date, resale_price, parent_id })
+                body: JSON.stringify({ item_name, price, purchase_date, status, end_date, resale_price, parent_id, tags, depreciation_method, expected_lifespan, expected_salvage })
             });
             const data = await res.json();
             if (res.ok) {
@@ -566,6 +604,10 @@ document.addEventListener('DOMContentLoaded', () => {
         statusEditParentId.value = record.parent_id || '';
         statusEditPrice.value = record.price;
         statusEditDate.value = record.purchase_date;
+        document.getElementById('statusEditTags').value = record.tags || '';
+        document.getElementById('statusEditDepreciationMethod').value = record.depreciation_method || 'straight_line';
+        document.getElementById('statusEditExpectedLifespan').value = record.expected_lifespan || 1095;
+        document.getElementById('statusEditExpectedSalvage').value = record.expected_salvage || 0;
 
         // Prevent setting itself as parent
         const options = statusEditParentId.options;
@@ -643,9 +685,40 @@ document.addEventListener('DOMContentLoaded', () => {
             animateValue(globalTotalPrice, oldPriceVal, stats.total_price, 800, true);
 
             document.getElementById('statTotal').textContent = stats.total_count;
-            document.getElementById('statActive').textContent = stats.status_counts.active;
-            document.getElementById('statBroken').textContent = stats.status_counts.broken;
-            document.getElementById('statSold').textContent = stats.status_counts.sold;
+            document.getElementById('statActive').textContent = stats.status_counts?.active || 0;
+            document.getElementById('statBroken').textContent = stats.status_counts?.broken || 0;
+            document.getElementById('statSold').textContent = stats.status_counts?.sold || 0;
+
+            // Render Tag Stats
+            const tagContainer = document.getElementById('tagStatsContainer');
+            if (tagContainer && stats.tag_stats) {
+                const tagEntries = Object.entries(stats.tag_stats).map(([name, data]) => ({ name, ...data }));
+                tagEntries.sort((a, b) => b.daily_cost - a.daily_cost);
+
+                if (tagEntries.length === 0) {
+                    tagContainer.innerHTML = '<div style="text-align:center; color:#94a3b8; font-size:0.85rem; padding: 20px;">暂无标签数据，请尝试为物品添加标签。</div>';
+                } else {
+                    const maxDailyCost = tagEntries[0].daily_cost;
+                    tagContainer.innerHTML = tagEntries.map(tag => {
+                        const percent = maxDailyCost > 0 ? (tag.daily_cost / maxDailyCost) * 100 : 0;
+                        return `
+                            <div class="tag-list-item">
+                                <div class="tag-list-header">
+                                    <span class="tag-list-name">#${tag.name}</span>
+                                    <span class="tag-list-cost">¥${tag.daily_cost.toFixed(2)}<span style="font-size:0.7rem; color:#94a3b8;">/天</span></span>
+                                </div>
+                                <div class="tag-progress-track">
+                                    <div class="tag-progress-fill" style="width: ${percent}%;"></div>
+                                </div>
+                                <div class="tag-list-sub" style="margin-top: 4px; text-align: right;">
+                                    包含投资: ¥${tag.total_price.toFixed(2)}
+                                </div>
+                            </div>
+                        `;
+                    }).join('');
+                }
+            }
+
         } catch (e) {
             console.error("加载统计数据失败", e);
         }
@@ -753,6 +826,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (status === 'sold') classModifiers += ' sold';
 
         let badges = '';
+        let tagBadges = '';
         let metaHtml = `个体总价 ￥${record.price.toFixed(2)}${isChild ? '' : ` · 已用 ${record._days} 天`}`;
 
         if (status === 'broken') {
@@ -760,6 +834,16 @@ document.addEventListener('DOMContentLoaded', () => {
         } else if (status === 'sold') {
             badges = '<span class="status-badge bg-yellow">已回血</span>';
             metaHtml = `个体积压 ￥${record._finalCost.toFixed(2)} (售￥${record.resale_price}) · 定格 ${record._days}天`;
+        } else {
+            metaHtml += ` · 估值 ￥${(record._currentValue || 0).toFixed(2)}`;
+        }
+
+        if (record.tags) {
+            const tagsArr = record.tags.split(/[,，\s]+/).map(t => t.trim()).filter(t => t);
+            tagsArr.forEach(t => {
+                const cleanTag = t.startsWith('#') ? t : '#' + t;
+                tagBadges += `<span class="tag-badge">${cleanTag}</span>`;
+            });
         }
 
         return `
@@ -767,7 +851,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 <div class="swipe-wrapper" ontouchstart="handleSwipeStart(event)" ontouchmove="handleSwipeMove(event)" ontouchend="handleSwipeEnd(event)">
                     <div class="swipe-content">
                         <div class="history-info">
-                            <span class="history-name" data-fulltext="${record.item_name}">${record.item_name} ${badges}</span>
+                            <span class="history-name" data-fulltext="${record.item_name}">${record.item_name} ${badges}${tagBadges}</span>
                             <span class="history-meta" data-fulltext="${metaHtml.replace(/￥/g, '\xA5')}">${metaHtml}</span>
                         </div>
                         <div class="history-cost">
@@ -800,6 +884,7 @@ document.addEventListener('DOMContentLoaded', () => {
             clone._dailyCost = costs.dailyCost;
             clone._days = costs.actualDaysForCalc;
             clone._finalCost = costs.finalCost;
+            clone._currentValue = costs.currentValue;
             return clone;
         });
 
@@ -830,6 +915,7 @@ document.addEventListener('DOMContentLoaded', () => {
             parent._aggDailyCost = parent._dailyCost;
             parent._aggFinalCost = parent._finalCost;
             parent._aggPrice = parent.price;
+            parent._aggCurrentValue = parent._currentValue;
             let aggMaxDays = parent._days;
 
             const children = childrenMap[parent.id] || [];
@@ -837,6 +923,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 parent._aggDailyCost += child._dailyCost;
                 parent._aggFinalCost += child._finalCost;
                 parent._aggPrice += child.price;
+                parent._aggCurrentValue += child._currentValue;
                 if (child._days > aggMaxDays) {
                     aggMaxDays = child._days;
                 }
@@ -846,6 +933,7 @@ document.addEventListener('DOMContentLoaded', () => {
             parent._dailyCost = parent._aggDailyCost;
             parent.price = parent._aggPrice;
             parent._finalCost = parent._aggFinalCost;
+            parent._currentValue = parent._aggCurrentValue;
             parent._days = aggMaxDays;
         });
 
@@ -927,74 +1015,42 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         // 7. Render Visualization Charts
-        renderChart(processedRecords);
+        renderChart();
         renderTrendChart(currentTrendRange);
     }
 
-    function renderChart(processedRecords) {
+    async function renderChart() {
         const ctx = document.getElementById('costChart');
         if (!ctx) return;
 
         const chartTitle = document.getElementById('chartTitle');
         const chartBackBtn = document.getElementById('chartBackBtn');
 
-        let dataToShow = [];
-
-        if (!chartCurrentParentId) {
-            if (chartBackBtn) chartBackBtn.classList.add('hidden');
-            if (chartTitle) chartTitle.innerText = "前5大消费本体";
-
-            const topLevelMap = {};
-            processedRecords.forEach(r => {
-                if (!r.parent_id) {
-                    topLevelMap[r.id] = { ...r, _aggDailyCost: r._dailyCost };
-                }
-            });
-
-            dataToShow = Object.values(topLevelMap);
-        } else {
-            if (chartBackBtn) chartBackBtn.classList.remove('hidden');
-            const parent = processedRecords.find(r => r.id === chartCurrentParentId);
-            if (chartTitle) chartTitle.innerText = parent ? `拆解: ${parent.item_name}` : '子项分布';
-
-            // Do not show the parent itself, only children
-            processedRecords.filter(r => r.parent_id === chartCurrentParentId).forEach(c => {
-                dataToShow.push({ ...c, _aggDailyCost: c._dailyCost });
-            });
+        let url = '/api/stats/pie';
+        if (chartCurrentParentId) {
+            url += `?parent_id=${chartCurrentParentId}`;
         }
 
-        const sortedForChart = dataToShow.sort((a, b) => b._aggDailyCost - a._aggDailyCost);
+        try {
+            const res = await fetch(url, { headers: getHeaders() });
+            if (!res.ok) return;
+            const dataObj = await res.json();
 
-        let labels = [];
-        let data = [];
-        let otherCost = 0;
-        let originalIds = [];
-
-        sortedForChart.forEach((item, index) => {
-            if (item._aggDailyCost <= 0) return;
-
-            if (index < 5) {
-                labels.push(item.item_name);
-                data.push(item._aggDailyCost.toFixed(2));
-                originalIds.push(item.id);
+            if (!chartCurrentParentId) {
+                if (chartBackBtn) chartBackBtn.classList.add('hidden');
+                if (chartTitle) chartTitle.innerText = "前5大消费本体";
             } else {
-                otherCost += item._aggDailyCost;
+                if (chartBackBtn) chartBackBtn.classList.remove('hidden');
+                if (chartTitle) chartTitle.innerText = dataObj.parentName ? `拆解: ${dataObj.parentName}` : '子项分布';
             }
-        });
 
-        if (otherCost > 0) {
-            labels.push('其他项并集');
-            data.push(otherCost.toFixed(2));
-            originalIds.push(null);
-        }
+            if (costChartInstance) {
+                costChartInstance.destroy();
+            }
 
-        if (costChartInstance) {
-            costChartInstance.destroy();
-        }
-
-        if (data.length === 0) {
-            ctx.classList.add('hidden');
-            return;
+            if (!dataObj.data || dataObj.data.length === 0) {
+                ctx.classList.add('hidden');
+                return;
         } else {
             ctx.classList.remove('hidden');
         }
@@ -1002,9 +1058,9 @@ document.addEventListener('DOMContentLoaded', () => {
         costChartInstance = new Chart(ctx, {
             type: 'doughnut',
             data: {
-                labels: labels,
+                labels: dataObj.labels,
                 datasets: [{
-                    data: data,
+                    data: dataObj.data,
                     backgroundColor: [
                         'rgba(59, 130, 246, 0.8)', 'rgba(167, 139, 250, 0.8)',
                         'rgba(16, 185, 129, 0.8)', 'rgba(245, 158, 11, 0.8)',
@@ -1020,13 +1076,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 onClick: (event, elements, chart) => {
                     if (elements.length > 0) {
                         const idx = elements[0].index;
-                        const clickedId = originalIds[idx];
-                        if (clickedId && !chartCurrentParentId) {
-                            const hasChildren = processedRecords.some(r => r.parent_id === clickedId);
-                            if (hasChildren) {
-                                chartCurrentParentId = clickedId;
-                                renderHistory();
-                            }
+                        const clickedId = dataObj.originalIds[idx];
+                        const hasChildren = dataObj.hasChildrenArray[idx];
+                        if (clickedId && !chartCurrentParentId && hasChildren) {
+                            chartCurrentParentId = clickedId;
+                            renderChart();
                         }
                     }
                 },
@@ -1041,6 +1095,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 cutout: '70%'
             }
         });
+        } catch(e) {
+            console.error(e);
+        }
     }
 
     async function renderTrendChart(range = '30d') {

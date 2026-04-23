@@ -69,45 +69,8 @@
         <div id="pane-home" class="spa-pane active">
 
             <main>
-                <div class="card glass">
-                    <form id="costForm">
-                        <div class="form-group">
-                            <label for="itemName">物品名称</label>
-                            <input type="text" id="itemName" required placeholder="例如：iPhone 15">
-                        </div>
-                        <div class="form-group">
-                            <label for="parentSelect">归属组合 (如: 主机)</label>
-                            <select id="parentSelect" class="sort-select" style="width: 100%;">
-                                <option value="">- 独立物品 -</option>
-                            </select>
-                        </div>
-                        <div class="form-group">
-                            <label for="price">花费金额 (元)</label>
-                            <input type="number" id="price" required min="0" step="0.01" placeholder="0.00">
-                        </div>
-                        <div class="form-group">
-                            <label for="purchaseDate">购买日期</label>
-                            <input type="date" id="purchaseDate" required>
-                        </div>
-                        <div class="form-group">
-                            <label for="initialStatus">当前状态</label>
-                            <select id="initialStatus" class="sort-select" style="width: 100%;">
-                                <option value="active">🟢 使用中</option>
-                                <option value="broken">🔴 已损坏</option>
-                                <option value="sold">🟡 已退役 (回血)</option>
-                            </select>
-                        </div>
-                        <div class="form-group hidden" id="formEndDateGroup">
-                            <label for="formEndDate">终止日期</label>
-                            <input type="date" id="formEndDate">
-                        </div>
-                        <div class="form-group hidden" id="formResalePriceGroup">
-                            <label for="formResalePrice">回血金额 (元)</label>
-                            <input type="number" id="formResalePrice" min="0" step="0.01" placeholder="0.00">
-                        </div>
-                        <button type="submit" class="btn">计算日均成本</button>
-                    </form>
-                </div>
+            <main style="position: relative;">
+                <button id="fabAddBtn" class="fab-btn" title="添加新记录" onclick="document.getElementById('addItemModal').classList.remove('hidden')">+</button>
 
                 <div class="history-section glass">
                     <div class="history-header">
@@ -132,7 +95,7 @@
                             </select>
                         </div>
                     </div>
-                    <div id="historyListScroll" class="history-list clusterize-scroll" style="max-height: 65vh; overflow-y: auto;">
+                    <div id="historyListScroll" class="history-list clusterize-scroll" style="max-height: 80vh; overflow-y: auto;">
                         <div id="historyListContent" class="clusterize-content">
                             <!-- Rows go here -->
                         </div>
@@ -205,8 +168,17 @@
                     
                     <h3 style="font-size: 0.85rem; color: #64748b; text-align: center; margin-top: 10px; font-weight: normal; width: 100%;">价值耗散趋势报告</h3>
                 </div>
-            </div>
-        </div>
+
+                <!-- Tag Chart -->
+                <div class="card glass stats-chart-card" style="flex: 1; display: flex; flex-direction: column; align-items: stretch; justify-content: flex-start; min-height: 250px; width: 100%; padding: 1.5rem;">
+                    <h3 style="font-size: 0.95rem; color: #e2e8f0; margin-bottom: 15px; font-weight: 500; text-align: left;">🏷️ 标签耗散分布 (日均)</h3>
+                    <div id="tagStatsContainer" style="flex: 1; display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; align-content: flex-start; overflow-y: auto; padding-right: 5px; width: 100%;">
+                        <div style="grid-column: 1 / -1; text-align:center; color:#94a3b8; font-size:0.85rem; padding: 20px;">暂无标签数据，请尝试为物品添加标签。</div>
+                    </div>
+                </div>
+
+            </div> <!-- End of stats-grid -->
+        </div> <!-- End of pane-stats -->
 
             <!-- Pane: Settings -->
         <div id="pane-settings" class="spa-pane hidden">
@@ -349,6 +321,29 @@
                 </div>
                 <hr style="border:0; border-top:1px solid var(--border-color); margin:1rem 0;">
                 <div class="form-group" style="margin-bottom: 0.8rem;">
+                    <label>分类标签 (多个用空格隔开)</label>
+                    <input type="text" id="statusEditTags" placeholder="#例如 数码">
+                </div>
+                <hr style="border:0; border-top:1px solid var(--border-color); margin:1rem 0;">
+                <div class="form-group" style="margin-bottom: 0.8rem;">
+                    <label for="statusEditDepreciationMethod">折旧算法 <span style="cursor:pointer; background:#3b82f6; color:#fff; padding:0 6px; border-radius:4px; font-size:0.8rem; margin-left:4px;" onclick="openDepreciationInfoModal()">i</span></label>
+                    <select id="statusEditDepreciationMethod" class="sort-select" style="width: 100%;">
+                        <option value="straight_line">直线折旧法 (均匀折旧)</option>
+                        <option value="double_declining">双倍余额递减法 (加速折旧)</option>
+                    </select>
+                </div>
+                <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px; margin-bottom: 0.8rem;">
+                    <div class="form-group">
+                        <label>预计寿命 (天)</label>
+                        <input type="number" id="statusEditExpectedLifespan" min="1" required>
+                    </div>
+                    <div class="form-group">
+                        <label>终期预估残值 (元)</label>
+                        <input type="number" id="statusEditExpectedSalvage" min="0" required>
+                    </div>
+                </div>
+                <hr style="border:0; border-top:1px solid var(--border-color); margin:1rem 0;">
+                <div class="form-group" style="margin-bottom: 0.8rem;">
                     <label for="statusSelect">当前状态</label>
                     <select id="statusSelect" class="sort-select" style="width: 100%;">
                         <option value="active">🟢 使用中 (正常计费)</option>
@@ -445,6 +440,120 @@
             <button id="importCancelBtn" class="btn" style="background: rgba(255,255,255,0.1); color: white;">取消导入</button>
         </div>
     </div>
+
+    <!-- Add Item Modal -->
+    <div id="addItemModal" class="modal-overlay hidden">
+        <div class="modal-content glass" style="max-width: 450px;">
+            <button class="modal-close" onclick="document.getElementById('addItemModal').classList.add('hidden')">&times;</button>
+            <h2 style="margin-bottom:1.5rem; text-align:left;">添加新物品</h2>
+            <form id="costForm" style="text-align: left;">
+                <div class="form-group">
+                    <label for="itemName">物品名称</label>
+                    <input type="text" id="itemName" required placeholder="例如：iPhone 15">
+                </div>
+                <div class="form-group">
+                    <label for="parentSelect">归属组合 (如: 主机)</label>
+                    <select id="parentSelect" class="sort-select" style="width: 100%;">
+                        <option value="">- 独立物品 -</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="itemTags">多维分类标签 (用逗号分隔，如：数码,生产力)</label>
+                    <input type="text" id="itemTags" placeholder="如: 数码,学习,消耗品">
+                </div>
+                <div class="form-group">
+                    <label for="formDepreciationMethod">折旧算法 <span style="cursor:pointer; background:#3b82f6; color:#fff; padding:0 6px; border-radius:4px; font-size:0.8rem; margin-left:4px;" onclick="openDepreciationInfoModal()">i</span></label>
+                    <select id="formDepreciationMethod" class="sort-select" style="width: 100%;">
+                        <option value="straight_line">直线折旧法 (按时间均匀折旧)</option>
+                        <option value="double_declining">双倍余额递减法 (早期折旧极快，适合数码)</option>
+                    </select>
+                </div>
+                <div style="display: flex; gap: 10px;">
+                    <div class="form-group" style="flex: 1;">
+                        <label for="formExpectedLifespan">预计寿命 (天)</label>
+                        <input type="number" id="formExpectedLifespan" min="1" value="1095" placeholder="例如 1095 (3年)">
+                    </div>
+                    <div class="form-group" style="flex: 1;">
+                        <label for="formExpectedSalvage">终期预估残值 (元)</label>
+                        <input type="number" id="formExpectedSalvage" min="0" value="0" placeholder="0.00">
+                    </div>
+                </div>
+                <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
+                    <div class="form-group">
+                        <label for="price">花费金额 (元)</label>
+                        <input type="number" id="price" required min="0" step="0.01" placeholder="0.00">
+                    </div>
+                    <div class="form-group">
+                        <label for="purchaseDate">购买日期</label>
+                        <input type="date" id="purchaseDate" required>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="initialStatus">当前状态</label>
+                    <select id="initialStatus" class="sort-select" style="width: 100%;">
+                        <option value="active">🟢 使用中</option>
+                        <option value="broken">🔴 已损坏</option>
+                        <option value="sold">🟡 已退役 (回血)</option>
+                    </select>
+                </div>
+                <div class="form-group hidden" id="formEndDateGroup">
+                    <label for="formEndDate">终止日期</label>
+                    <input type="date" id="formEndDate">
+                </div>
+                <div class="form-group hidden" id="formResalePriceGroup">
+                    <label for="formResalePrice">回血金额 (元)</label>
+                    <input type="number" id="formResalePrice" min="0" step="0.01" placeholder="0.00">
+                </div>
+                <button type="submit" class="btn" style="margin-top: 1rem;">添加记录</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Depreciation Info Modal -->
+    <div id="depreciationInfoModal" class="modal-overlay hidden" style="z-index: 10000;">
+        <div class="modal-content glass" style="max-width: 500px; text-align: left;">
+            <button class="modal-close" onclick="document.getElementById('depreciationInfoModal').classList.add('hidden')">&times;</button>
+            <h2 style="margin-bottom:1.5rem;">折旧算法说明</h2>
+            
+            <div style="margin-bottom: 1.5rem;">
+                <h3 style="color: #60a5fa; margin-bottom: 0.5rem; display: flex; align-items: center; gap: 8px;">
+                    <span>📈</span> 直线折旧法 (Straight-Line)
+                </h3>
+                <p style="color: #cbd5e1; font-size: 0.9rem; line-height: 1.6; margin-bottom: 0.5rem;">
+                    <strong>适用场景：</strong> 桌椅、家具、普通家电等寿命较长、保值率稳定的物品。
+                </p>
+                <p style="color: #94a3b8; font-size: 0.85rem; line-height: 1.6;">
+                    <strong>计算逻辑：</strong> 每天等额掉价。<br>
+                    公式：<code style="background: rgba(255,255,255,0.1); padding: 2px 4px; border-radius: 4px;">每日折旧额 = (买入金额 - 预估残值) ÷ 预计寿命天数</code><br>
+                    当前估值 = 买入金额 - (每日折旧额 × 已使用天数)
+                </p>
+            </div>
+
+            <div style="margin-bottom: 1.5rem;">
+                <h3 style="color: #f472b6; margin-bottom: 0.5rem; display: flex; align-items: center; gap: 8px;">
+                    <span>📉</span> 双倍余额递减法 (Double Declining Balance)
+                </h3>
+                <p style="color: #cbd5e1; font-size: 0.9rem; line-height: 1.6; margin-bottom: 0.5rem;">
+                    <strong>适用场景：</strong> 手机、显卡、汽车等<strong>前期掉价极快</strong>，越往后掉价越慢的消费品。
+                </p>
+                <p style="color: #94a3b8; font-size: 0.85rem; line-height: 1.6;">
+                    <strong>计算逻辑：</strong> 使用按日复利衰减模型，折旧率是直线法的两倍。<br>
+                    公式：<code style="background: rgba(255,255,255,0.1); padding: 2px 4px; border-radius: 4px;">每日折旧率 = 2 ÷ 预计寿命天数</code><br>
+                    当前估值 = 买入金额 × (1 - 每日折旧率)<sup>已使用天数</sup><br>
+                    <em>* 当估值低于预估残值时，估值将锁定在预估残值，不再下跌。</em>
+                </p>
+            </div>
+            
+            <div style="text-align: right; margin-top: 1rem;">
+                <button type="button" class="btn" onclick="document.getElementById('depreciationInfoModal').classList.add('hidden')">我知道了</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Background Decoration -->
+    <div class="bg-shape shape-1"></div>
+    <div class="bg-shape shape-2"></div>
+    <div class="bg-shape shape-3"></div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/clusterize.js/0.19.0/clusterize.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
