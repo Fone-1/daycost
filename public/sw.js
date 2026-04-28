@@ -1,4 +1,4 @@
-const CACHE_NAME = 'daycost-v11';
+const CACHE_NAME = 'daycost-v19';
 const ASSETS_TO_CACHE = [
     '/',
     '/index.html',
@@ -36,27 +36,12 @@ self.addEventListener('activate', event => {
     self.clients.claim();
 });
 
-// Fetch Event: Stale-While-Revalidate for UI, Network-First for API
+// Fetch Event: Stale-While-Revalidate for UI, Network-only for API
 self.addEventListener('fetch', event => {
     const url = new URL(event.request.url);
 
-    // API Handling: Network First
+    // API responses are user-specific and mutate frequently. Do not cache them.
     if (url.pathname.startsWith('/api/')) {
-        event.respondWith(
-            fetch(event.request)
-                .then(response => {
-                    // Update cache for API if successful
-                    const responseClone = response.clone();
-                    caches.open(CACHE_NAME).then(cache => {
-                        cache.put(event.request, responseClone);
-                    });
-                    return response;
-                })
-                .catch(() => {
-                    // Fallback to cache if network fails
-                    return caches.match(event.request);
-                })
-        );
         return;
     }
 

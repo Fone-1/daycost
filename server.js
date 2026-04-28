@@ -10,6 +10,10 @@ const PORT = process.env.PORT || 80;
 const JWT_SECRET = process.env.JWT_SECRET || 'daycost_dev_secret_key_999';
 const DB_PATH = process.env.DB_PATH || path.join(__dirname, 'data.db');
 
+if (process.env.NODE_ENV === 'production' && JWT_SECRET === 'daycost_dev_secret_key_999') {
+    throw new Error('JWT_SECRET must be set in production.');
+}
+
 // Middleware
 app.use(cors());
 app.use(express.json());
@@ -179,167 +183,280 @@ app.put('/api/auth/password', authenticateToken, (req, res) => {
 
 // --- RECORDS APIs ---
 
-// Get User Records (Active) with Pagination and Sorting
-app.get('/api/records', authenticateToken, (req, res) => {
-    const page = parseInt(req.query.page) || 1;
-    const limit = parseInt(req.query.limit) || 50;
-    const offset = (page - 1) * limit;
-    const sortBy = req.query.sortBy || 'created_at';
-    const sortOrder = req.query.sortOrder || 'DESC';
-    const searchQuery = req.query.q ? `%${req.query.q}%` : null;
-    const statusFilter = req.query.status && req.query.status !== 'all' ? req.query.status : null;
+// Centralized Tree-Aware Filtering Engine
+function getFilteredTreeRecords(userId, queryParams, db) {
+    return new Promise((resolve, reject) => {
+        db.all(`SELECT * FROM records WHERE user_id = ? AND is_deleted = 0`, [userId], (err, rows) => {
+            if (err) return reject(err);
 
-    // Whitelist valid columns for sorting
-    let sqlSortExpression = 'created_at';
-    if (sortBy === 'price') sqlSortExpression = 'price';
-    else if (sortBy === 'item_name') sqlSortExpression = 'item_name';
-    else if (sortBy === 'purchase_date') sqlSortExpression = 'purchase_date';
-    else if (sortBy === 'dailyCost') {
-        sqlSortExpression = `(CASE 
-                WHEN status = 'active' OR status IS NULL THEN price / (julianday('now') - julianday(purchase_date) + 1)
-                WHEN status = 'broken' THEN price / (julianday(end_date) - julianday(purchase_date) + 1)
-                WHEN status = 'sold' THEN (price - resale_price) / (julianday(end_date) - julianday(purchase_date) + 1)
-                ELSE 0 
-            END)`;
-    } else if (sortBy === 'days') {
-        sqlSortExpression = `(CASE 
-                WHEN status = 'active' OR status IS NULL THEN (julianday('now') - julianday(purchase_date) + 1)
-                WHEN status = 'broken' THEN (julianday(end_date) - julianday(purchase_date) + 1)
-                WHEN status = 'sold' THEN (julianday(end_date) - julianday(purchase_date) + 1)
-                ELSE 0 
-            END)`;
-    }
-    
-    const actualSortOrder = sortOrder.toUpperCase() === 'ASC' ? 'ASC' : 'DESC';
+            const { q, status, statsType, statsValue } = queryParams;
+            const searchQuery = q ? q.toLowerCase() : null;
+            const statusFilter = status && status !== 'all' ? status : null;
 
-    let sqlCount = `SELECT COUNT(*) as total FROM records WHERE user_id = ? AND is_deleted = 0`;
-    let sqlData = `SELECT * FROM records WHERE user_id = ? AND is_deleted = 0`;
-    let params = [req.user.id];
+            // 1. Calculate individual costs
+            const processedRecords = rows.map(record => {
+                const purchaseDate = new Date(record.purchase_date);
+                purchaseDate.setHours(0, 0, 0, 0);
 
-    if (searchQuery) {
-        sqlCount += ` AND item_name LIKE ?`;
-        sqlData += ` AND item_name LIKE ?`;
-        params.push(searchQuery);
-    }
-    
-    if (statusFilter) {
-        sqlCount += ` AND status = ?`;
-        sqlData += ` AND status = ?`;
-        params.push(statusFilter);
-    }
+                let endDate = new Date();
+                const recordStatus = record.status || 'active';
 
-    sqlData += ` ORDER BY ${sqlSortExpression} ${actualSortOrder} LIMIT ? OFFSET ?`;
+                if (recordStatus !== 'active' && record.end_date) {
+                    endDate = new Date(record.end_date);
+                }
+                endDate.setHours(0, 0, 0, 0);
 
-    db.get(sqlCount, params, (err, countRow) => {
-        if (err) return res.status(500).json({ error: '查询失败' });
-        const total = countRow.total;
+                const timeDiff = Math.max(0, endDate.getTime() - purchaseDate.getTime());
+                let daysUsed = Math.floor(timeDiff / (1000 * 3600 * 24));
+                const actualDaysForCalc = daysUsed + 1;
 
-        const dataParams = [...params, limit, offset];
-        db.all(sqlData, dataParams, (err, rows) => {
-                if (err) return res.status(500).json({ error: '查询失败' });
-                res.json({
-                    total,
-                    page,
-                    limit,
-                    hasMore: offset + rows.length < total,
-                    data: rows
+                let finalCost = record.price;
+                if (recordStatus === 'sold') {
+                    finalCost = Math.max(0, record.price - (record.resale_price || 0));
+                }
+
+                let currentValue = record.price;
+                if (recordStatus === 'sold') {
+                    currentValue = record.resale_price || 0;
+                } else if (recordStatus === 'broken') {
+                    currentValue = 0;
+                } else {
+                    const depMethod = record.depreciation_method || 'straight_line';
+                    const lifespan = record.expected_lifespan || 1095;
+                    const salvage = record.expected_salvage || 0;
+                    
+                    if (depMethod === 'straight_line') {
+                        const dailyDep = (record.price - salvage) / lifespan;
+                        currentValue = Math.max(salvage, record.price - (dailyDep * actualDaysForCalc));
+                    } else if (depMethod === 'double_declining') {
+                        const dailyRate = 2 / lifespan;
+                        currentValue = record.price * Math.pow(1 - dailyRate, actualDaysForCalc);
+                        currentValue = Math.max(salvage, currentValue);
+                    }
+                }
+
+                return {
+                    ...record,
+                    _dailyCost: finalCost / actualDaysForCalc,
+                    _days: actualDaysForCalc,
+                    _finalCost: finalCost,
+                    _currentValue: currentValue
+                };
+            });
+
+            // 2. Build tree and aggregate
+            const topLevelMap = {};
+            const childrenMap = {};
+
+            processedRecords.forEach(r => {
+                if (r.parent_id) {
+                    if (!childrenMap[r.parent_id]) childrenMap[r.parent_id] = [];
+                    childrenMap[r.parent_id].push(r);
+                } else {
+                    r._aggDailyCost = r._dailyCost;
+                    r._aggFinalCost = r._finalCost;
+                    r._aggPrice = r.price;
+                    r._aggCurrentValue = r._currentValue;
+                    r._aggDays = r._days;
+                    topLevelMap[r.id] = r;
+                }
+            });
+
+            // Handle orphans (children whose parent is deleted)
+            processedRecords.forEach(r => {
+                if (r.parent_id && !topLevelMap[r.parent_id]) {
+                    r._aggDailyCost = r._dailyCost;
+                    r._aggFinalCost = r._finalCost;
+                    r._aggPrice = r.price;
+                    r._aggCurrentValue = r._currentValue;
+                    r._aggDays = r._days;
+                    topLevelMap[r.id] = r; // Promote to top-level
+                }
+            });
+
+            // Aggregate children into parents
+            Object.values(topLevelMap).forEach(parent => {
+                const children = childrenMap[parent.id] || [];
+                children.forEach(child => {
+                    parent._aggDailyCost += child._dailyCost;
+                    parent._aggFinalCost += child._finalCost;
+                    parent._aggPrice += child.price;
+                    parent._aggCurrentValue += child._currentValue;
+                    if (child._days > parent._aggDays) parent._aggDays = child._days;
                 });
-            }
-        );
+            });
+
+            // 3. Filter (Tree-Aware: keep parent if it OR ANY child matches)
+            const matchesStatsFilter = (member, parent) => {
+                if (!statsType || !statsValue) return true;
+
+                if (statsType === 'status') {
+                    return (member.status || 'active') === statsValue;
+                }
+
+                if (statsType === 'tag') {
+                    const tags = (member.tags || '')
+                        .split(/[,，\s]+/)
+                        .map(t => t.trim().replace(/^#/, '').toLowerCase())
+                        .filter(Boolean);
+                    return tags.includes(String(statsValue).toLowerCase().replace(/^#/, ''));
+                }
+
+                if (statsType === 'group') {
+                    return String(parent.id) === String(statsValue) || String(member.parent_id || '') === String(statsValue);
+                }
+
+                if (statsType === 'month') {
+                    return typeof member.purchase_date === 'string' && member.purchase_date.startsWith(statsValue);
+                }
+
+                return true;
+            };
+
+            let matchedTopLevelIds = new Set();
+            Object.values(topLevelMap).forEach(parent => {
+                const family = [parent, ...(childrenMap[parent.id] || [])];
+                let matches = false;
+                for (const member of family) {
+                    let matchSearch = !searchQuery || member.item_name.toLowerCase().includes(searchQuery) || (member.tags && member.tags.toLowerCase().includes(searchQuery));
+                    let matchStatus = !statusFilter || member.status === statusFilter;
+                    let matchStats = matchesStatsFilter(member, parent);
+                    if (matchSearch && matchStatus && matchStats) {
+                        matches = true;
+                        break;
+                    }
+                }
+                if (matches) matchedTopLevelIds.add(parent.id);
+            });
+
+            const filteredTopLevel = Object.values(topLevelMap).filter(p => matchedTopLevelIds.has(p.id));
+            
+            // Generate all matching flat records for charts/stats
+            const allMatchedRecords = [];
+            filteredTopLevel.forEach(parent => {
+                allMatchedRecords.push(parent);
+                if (childrenMap[parent.id]) {
+                    allMatchedRecords.push(...childrenMap[parent.id]);
+                }
+            });
+
+            resolve({ filteredTopLevel, childrenMap, allMatchedRecords });
+        });
     });
+}
+
+// Get User Records (Active) with Pagination and Sorting
+app.get('/api/records', authenticateToken, async (req, res) => {
+    try {
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 50;
+        const offset = (page - 1) * limit;
+        const sortBy = req.query.sortBy || 'created_at';
+        const sortOrder = (req.query.sortOrder || 'DESC').toUpperCase();
+
+        const { filteredTopLevel, childrenMap } = await getFilteredTreeRecords(req.user.id, req.query, db);
+
+        // 4. Sort Top-Level
+        filteredTopLevel.sort((a, b) => {
+            let valA, valB;
+            if (sortBy === 'price') { valA = a._aggPrice; valB = b._aggPrice; }
+            else if (sortBy === 'dailyCost') { valA = a._aggDailyCost; valB = b._aggDailyCost; }
+            else if (sortBy === 'days') { valA = a._aggDays; valB = b._aggDays; }
+            else if (sortBy === 'item_name') { valA = a.item_name; valB = b.item_name; }
+            else { valA = new Date(a.created_at).getTime(); valB = new Date(b.created_at).getTime(); }
+
+            if (valA < valB) return sortOrder === 'ASC' ? -1 : 1;
+            if (valA > valB) return sortOrder === 'ASC' ? 1 : -1;
+            return 0;
+        });
+
+        // 5. Paginate Top-Level
+        const paginatedTopLevel = filteredTopLevel.slice(offset, offset + limit);
+
+        // 6. Assemble Final Data (Parents + Their Children)
+        const finalData = [];
+        paginatedTopLevel.forEach(parent => {
+            finalData.push(parent);
+            const children = childrenMap[parent.id] || [];
+            
+            // Sort children too
+            children.sort((a, b) => {
+                let valA, valB;
+                if (sortBy === 'price') { valA = a.price; valB = b.price; }
+                else if (sortBy === 'dailyCost') { valA = a._dailyCost; valB = b._dailyCost; }
+                else if (sortBy === 'days') { valA = a._days; valB = b._days; }
+                else if (sortBy === 'item_name') { valA = a.item_name; valB = b.item_name; }
+                else { valA = new Date(a.created_at).getTime(); valB = new Date(b.created_at).getTime(); }
+                if (valA < valB) return sortOrder === 'ASC' ? -1 : 1;
+                if (valA > valB) return sortOrder === 'ASC' ? 1 : -1;
+                return 0;
+            });
+            
+            finalData.push(...children);
+        });
+
+        res.json({
+            total: filteredTopLevel.length, // Total is now number of top-level families!
+            page,
+            limit,
+            hasMore: offset + paginatedTopLevel.length < filteredTopLevel.length,
+            data: finalData
+        });
+    } catch (err) {
+        console.error("API Records Error:", err);
+        res.status(500).json({ error: '查询失败' });
+    }
 });
 
 // New API: Get Aggregated Stats (Backend calculation)
-app.get('/api/stats', authenticateToken, (req, res) => {
-    const userId = req.user.id;
+app.get('/api/stats', authenticateToken, async (req, res) => {
+    try {
+        const { filteredTopLevel, allMatchedRecords } = await getFilteredTreeRecords(req.user.id, req.query, db);
 
-    const sqlStats = `
-        SELECT 
-            SUM(CASE 
-                WHEN status = 'active' OR status IS NULL THEN price / (julianday('now') - julianday(purchase_date) + 1)
-                WHEN status = 'broken' THEN price / (julianday(end_date) - julianday(purchase_date) + 1)
-                WHEN status = 'sold' THEN (price - resale_price) / (julianday(end_date) - julianday(purchase_date) + 1)
-                ELSE 0 
-            END) as total_daily_cost,
-            SUM(price) as total_price,
-            COUNT(*) as total_count
-        FROM records 
-        WHERE user_id = ? AND is_deleted = 0
-    `;
-
-    const sqlStatusCounts = `
-        SELECT status, COUNT(*) as count 
-        FROM records 
-        WHERE user_id = ? AND is_deleted = 0 
-        GROUP BY status
-    `;
-
-    db.get(sqlStats, [userId], (err, statsRow) => {
-        if (err) return res.status(500).json({ error: '统计计算失败' });
-
-        db.all(sqlStatusCounts, [userId], (err, statusRows) => {
-            if (err) return res.status(500).json({ error: '状态统计失败' });
-
-            const statusCounts = { active: 0, broken: 0, sold: 0 };
-            statusRows.forEach(row => {
-                if (row.status) statusCounts[row.status] = row.count;
-            });
-
-            const sqlTags = `SELECT tags, price, purchase_date, status, end_date, resale_price FROM records WHERE user_id = ? AND is_deleted = 0 AND tags IS NOT NULL AND tags != ''`;
-            db.all(sqlTags, [userId], (err, tagRows) => {
-                if (err) return res.status(500).json({ error: '标签统计失败' });
-
-                const tagStats = {};
-                const now = new Date();
-                now.setHours(0, 0, 0, 0);
-
-                tagRows.forEach(row => {
-                    const purchaseDate = new Date(row.purchase_date);
-                    purchaseDate.setHours(0, 0, 0, 0);
-                    let endDate = new Date(now.getTime());
-                    const status = row.status || 'active';
-                    let finalCost = row.price;
-                    
-                    if (status !== 'active' && row.end_date) {
-                        const itemEndDate = new Date(row.end_date);
-                        itemEndDate.setHours(0, 0, 0, 0);
-                        if (now >= itemEndDate) {
-                            endDate = itemEndDate;
-                            if (status === 'sold') {
-                                finalCost = Math.max(0, row.price - (row.resale_price || 0));
-                            }
-                        }
-                    }
-                    
-                    const timeDiff = Math.max(0, endDate.getTime() - purchaseDate.getTime());
-                    const daysUsed = Math.floor(timeDiff / (1000 * 3600 * 24)) + 1;
-                    const dailyCost = finalCost / daysUsed;
-
-                    const tagsArr = row.tags.split(/[,，\s]+/).map(t => t.trim()).filter(t => t);
-                    
-                    tagsArr.forEach(t => {
-                        const cleanTag = t.startsWith('#') ? t.substring(1) : t;
-                        if (!cleanTag) return;
-                        if (!tagStats[cleanTag]) {
-                            tagStats[cleanTag] = { total_price: 0, daily_cost: 0 };
-                        }
-                        tagStats[cleanTag].total_price += row.price;
-                        tagStats[cleanTag].daily_cost += dailyCost;
-                    });
-                });
-
-                res.json({
-                    total_daily_cost: statsRow.total_daily_cost || 0,
-                    total_price: statsRow.total_price || 0,
-                    total_count: statsRow.total_count || 0,
-                    status_counts: statusCounts,
-                    tag_stats: tagStats
-                });
-            });
+        let total_daily_cost = 0;
+        let total_price = 0;
+        
+        filteredTopLevel.forEach(p => {
+            total_daily_cost += p._aggDailyCost;
+            total_price += p._aggPrice;
         });
-    });
+
+        const statusCounts = { active: 0, broken: 0, sold: 0 };
+        const tagStats = {};
+
+        allMatchedRecords.forEach(row => {
+            const status = row.status || 'active';
+            statusCounts[status] = (statusCounts[status] || 0) + 1;
+
+            if (row.tags) {
+                const tagsArr = row.tags.split(/[,，\s]+/).map(t => t.trim()).filter(t => t);
+                tagsArr.forEach(t => {
+                    const cleanTag = t.startsWith('#') ? t.substring(1) : t;
+                    if (!cleanTag) return;
+                    if (!tagStats[cleanTag]) {
+                        tagStats[cleanTag] = { total_price: 0, daily_cost: 0 };
+                    }
+                    tagStats[cleanTag].total_price += row.price;
+                    tagStats[cleanTag].daily_cost += row._dailyCost;
+                });
+            }
+        });
+
+        res.json({
+            total_daily_cost,
+            total_price,
+            total_count: allMatchedRecords.length,
+            status_counts: statusCounts,
+            tag_stats: tagStats
+        });
+    } catch (err) {
+        console.error("API Stats Error:", err);
+        res.status(500).json({ error: '统计计算失败' });
+    }
 });
 
+// Legacy duplicate /api/records POST. Disabled so the complete implementation below handles all fields.
+/*
 // Add Record
 app.post('/api/records', authenticateToken, (req, res) => {
     const { item_name, price, purchase_date, parent_id, tags } = req.body;
@@ -355,6 +472,8 @@ app.post('/api/records', authenticateToken, (req, res) => {
         }
     );
 });
+
+*/
 
 // Delete Record (Soft Delete)
 app.delete('/api/records/:id', authenticateToken, (req, res) => {
@@ -408,12 +527,12 @@ app.delete('/api/records/purge/:id', authenticateToken, (req, res) => {
 });
 
 // New API: Get Trend Data (Backend calculation)
-app.get('/api/stats/trend', authenticateToken, (req, res) => {
-    const userId = req.user.id;
-    const range = req.query.range || '30d';
+app.get('/api/stats/trend', authenticateToken, async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const range = req.query.range || '30d';
 
-    db.all(`SELECT * FROM records WHERE user_id = ? AND is_deleted = 0`, [userId], (err, records) => {
-        if (err) return res.status(500).json({ error: '获取趋势数据失败' });
+        const { allMatchedRecords } = await getFilteredTreeRecords(userId, req.query, db);
 
         const now = new Date();
         now.setHours(0, 0, 0, 0);
@@ -446,14 +565,17 @@ app.get('/api/stats/trend', authenticateToken, (req, res) => {
             labels.push(dateStr);
 
             let daySum = 0;
-            records.forEach(record => {
+            allMatchedRecords.forEach(record => {
                 daySum += simulateCostAtDate(record, d);
             });
             points.push(daySum.toFixed(2));
         }
 
         res.json({ labels, data: points });
-    });
+    } catch (err) {
+        console.error("API Trend Error:", err);
+        res.status(500).json({ error: '获取趋势数据失败' });
+    }
 
     function simulateCostAtDate(record, targetDate) {
         const purchaseDate = new Date(record.purchase_date);
@@ -486,75 +608,21 @@ app.get('/api/stats/trend', authenticateToken, (req, res) => {
 });
 
 // New API: Get Pie Chart Data (Backend extraction)
-app.get('/api/stats/pie', authenticateToken, (req, res) => {
-    const userId = req.user.id;
-    const parentId = req.query.parent_id || null;
+app.get('/api/stats/pie', authenticateToken, async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const parentId = req.query.parent_id || null;
 
-    db.all(`SELECT id, item_name, price, purchase_date, status, end_date, resale_price, parent_id FROM records WHERE user_id = ? AND is_deleted = 0`, [userId], (err, records) => {
-        if (err) return res.status(500).json({ error: '获取图表数据失败' });
-
-        const now = new Date();
-        const recordsWithCost = records.map(record => {
-            const purchaseDate = new Date(record.purchase_date);
-            purchaseDate.setHours(0, 0, 0, 0);
-            
-            let endDate = new Date(now.getTime());
-            const status = record.status || 'active';
-            let finalCost = record.price;
-
-            if (status !== 'active' && record.end_date) {
-                const itemEndDate = new Date(record.end_date);
-                itemEndDate.setHours(0, 0, 0, 0);
-                if (now >= itemEndDate) {
-                    endDate = itemEndDate;
-                    if (status === 'sold') {
-                        finalCost = Math.max(0, record.price - (record.resale_price || 0));
-                    }
-                }
-            }
-            
-            const timeDiff = Math.max(0, endDate.getTime() - purchaseDate.getTime());
-            const daysUsed = Math.floor(timeDiff / (1000 * 3600 * 24)) + 1;
-            const dailyCost = finalCost / daysUsed;
-
-            return { ...record, _dailyCost: dailyCost };
-        });
+        const { filteredTopLevel, childrenMap } = await getFilteredTreeRecords(userId, req.query, db);
 
         let dataToShow = [];
-        let childrenCountMap = {};
-
-        recordsWithCost.forEach(r => {
-            if (r.parent_id) {
-                childrenCountMap[r.parent_id] = (childrenCountMap[r.parent_id] || 0) + 1;
-            }
-        });
 
         if (!parentId) {
-            const topLevelMap = {};
-            const childrenMap = {};
-
-            recordsWithCost.forEach(r => {
-                if (r.parent_id) {
-                    if (!childrenMap[r.parent_id]) childrenMap[r.parent_id] = [];
-                    childrenMap[r.parent_id].push(r);
-                } else {
-                    topLevelMap[r.id] = { ...r, _aggDailyCost: r._dailyCost };
-                }
-            });
-
-            Object.values(topLevelMap).forEach(parent => {
-                const children = childrenMap[parent.id] || [];
-                children.forEach(child => {
-                    parent._aggDailyCost += child._dailyCost;
-                });
-            });
-
-            dataToShow = Object.values(topLevelMap);
+            dataToShow = filteredTopLevel;
         } else {
             const pid = parseInt(parentId);
-            dataToShow = recordsWithCost
-                .filter(r => r.parent_id === pid)
-                .map(c => ({ ...c, _aggDailyCost: c._dailyCost }));
+            const children = childrenMap[pid] || [];
+            dataToShow = children.map(c => ({ ...c, _aggDailyCost: c._dailyCost }));
         }
 
         const sortedForChart = dataToShow.sort((a, b) => b._aggDailyCost - a._aggDailyCost);
@@ -572,7 +640,8 @@ app.get('/api/stats/pie', authenticateToken, (req, res) => {
                 labels.push(item.item_name);
                 data.push(item._aggDailyCost.toFixed(2));
                 originalIds.push(item.id);
-                hasChildrenArray.push(!!childrenCountMap[item.id]);
+                // Check if it has children in childrenMap
+                hasChildrenArray.push(!!childrenMap[item.id] && childrenMap[item.id].length > 0);
             } else {
                 otherCost += item._aggDailyCost;
             }
@@ -587,14 +656,20 @@ app.get('/api/stats/pie', authenticateToken, (req, res) => {
 
         let parentName = null;
         if (parentId) {
-            const parent = records.find(r => r.id === parseInt(parentId));
-            if (parent) parentName = parent.item_name;
+            db.get(`SELECT item_name FROM records WHERE id = ?`, [parentId], (err, row) => {
+                if (row) parentName = row.item_name;
+                res.json({ labels, data, originalIds, hasChildrenArray, parentName });
+            });
+        } else {
+            res.json({ labels, data, originalIds, hasChildrenArray, parentName: null });
         }
-
-        res.json({ labels, data, originalIds, hasChildrenArray, parentName });
-    });
+    } catch (err) {
+        console.error("API Pie Error:", err);
+        res.status(500).json({ error: '获取图表数据失败' });
+    }
 });
 
+/*
 app.post('/api/records', authenticateToken, (req, res) => {
     const { item_name, price, purchase_date, status, end_date, resale_price, parent_id, tags, depreciation_method, expected_lifespan, expected_salvage } = req.body;
 
@@ -623,10 +698,67 @@ app.post('/api/records', authenticateToken, (req, res) => {
     }
 });
 
+*/
+
+app.post('/api/records', authenticateToken, (req, res) => {
+    const { item_name, price, purchase_date, status, end_date, resale_price, parent_id, tags, depreciation_method, expected_lifespan, expected_salvage } = req.body;
+    const normalizedStatus = status || 'active';
+    const normalizedPrice = Number(price);
+    const normalizedResale = Number(resale_price || 0);
+    const normalizedLifespan = Number(expected_lifespan || 1095);
+    const normalizedSalvage = Number(expected_salvage || 0);
+
+    if (!item_name || price == null || !purchase_date) {
+        return res.status(400).json({ error: 'Please provide item name, price and purchase date.' });
+    }
+    if (!['active', 'broken', 'sold'].includes(normalizedStatus)) {
+        return res.status(400).json({ error: 'Invalid status.' });
+    }
+    if (!Number.isFinite(normalizedPrice) || normalizedPrice < 0) {
+        return res.status(400).json({ error: 'Price must be a non-negative number.' });
+    }
+    if (!Number.isFinite(normalizedResale) || normalizedResale < 0 || normalizedResale > normalizedPrice) {
+        return res.status(400).json({ error: 'Resale price must be between 0 and item price.' });
+    }
+    if (!Number.isFinite(normalizedLifespan) || normalizedLifespan < 1) {
+        return res.status(400).json({ error: 'Expected lifespan must be at least 1 day.' });
+    }
+    if (!Number.isFinite(normalizedSalvage) || normalizedSalvage < 0 || normalizedSalvage > normalizedPrice) {
+        return res.status(400).json({ error: 'Expected salvage must be between 0 and item price.' });
+    }
+    if ((normalizedStatus === 'broken' || normalizedStatus === 'sold') && !end_date) {
+        return res.status(400).json({ error: 'End date is required for broken or sold records.' });
+    }
+    if (end_date && new Date(end_date) < new Date(purchase_date)) {
+        return res.status(400).json({ error: 'End date cannot be earlier than purchase date.' });
+    }
+
+    const executeInsert = () => {
+        db.run(
+            `INSERT INTO records (user_id, item_name, price, purchase_date, status, end_date, resale_price, parent_id, tags, depreciation_method, expected_lifespan, expected_salvage) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [req.user.id, item_name, normalizedPrice, purchase_date, normalizedStatus, end_date || null, normalizedResale, parent_id || null, tags || '', depreciation_method || 'straight_line', normalizedLifespan, normalizedSalvage],
+            function (err) {
+                if (err) return res.status(500).json({ error: 'Failed to add record.' });
+                res.json({ message: 'Record added.', id: this.lastID });
+            }
+        );
+    };
+
+    if (!parent_id) return executeInsert();
+
+    db.get(`SELECT id, parent_id FROM records WHERE id = ? AND user_id = ? AND is_deleted = 0`, [parent_id, req.user.id], (err, row) => {
+        if (err) return res.status(500).json({ error: 'Failed to validate parent record.' });
+        if (!row) return res.status(400).json({ error: 'Parent record does not exist.' });
+        if (row.parent_id) return res.status(400).json({ error: 'Only one nested level is supported.' });
+        executeInsert();
+    });
+});
+
+/*
 // Update Record (Full Edit)
 app.put('/api/records/:id', authenticateToken, (req, res) => {
     const recordId = req.params.id;
-    const { item_name, price, purchase_date, status, end_date, resale_price, parent_id, tags, depreciation_method, expected_lifespan, expected_salvage } = req.body;
+    const { item_name, price, purchase_date, status, end_date, resale_price, parent_id, tags, depreciation_method, expected_lifespan, expected_salvage, cascadeAction } = req.body;
 
     if (!item_name || price == null || !purchase_date) {
         return res.status(400).json({ error: '请填写完整的物品名称、金额和买入日期' });
@@ -647,18 +779,155 @@ app.put('/api/records/:id', authenticateToken, (req, res) => {
     }
 
     function executeUpdate() {
-        db.run(
-        `UPDATE records SET item_name = ?, price = ?, purchase_date = ?, status = ?, end_date = ?, resale_price = ?, parent_id = ?, tags = ?, depreciation_method = ?, expected_lifespan = ?, expected_salvage = ? WHERE id = ? AND user_id = ?`,
-        [item_name, price, purchase_date, status, end_date || null, resale_price || 0, parent_id || null, tags || '', depreciation_method || 'straight_line', expected_lifespan || 1095, expected_salvage || 0, recordId, req.user.id],
-        function (err) {
-                if (err) return res.status(500).json({ error: '更新失败' });
-                if (this.changes === 0) return res.status(404).json({ error: '记录不存在或无权限' });
-                res.json({ message: '记录已更新' });
+        db.serialize(() => {
+            db.run('BEGIN TRANSACTION;');
+            db.run(
+                `UPDATE records SET item_name = ?, price = ?, purchase_date = ?, status = ?, end_date = ?, resale_price = ?, parent_id = ?, tags = ?, depreciation_method = ?, expected_lifespan = ?, expected_salvage = ? WHERE id = ? AND user_id = ?`,
+                [item_name, price, purchase_date, status, end_date || null, resale_price || 0, parent_id || null, tags || '', depreciation_method || 'straight_line', expected_lifespan || 1095, expected_salvage || 0, recordId, req.user.id]
+            );
+
+            if (cascadeAction === 'bundle') {
+                db.run(
+                    `UPDATE records SET status = ?, end_date = ?, resale_price = 0 WHERE parent_id = ? AND user_id = ?`,
+                    [status, end_date || null, recordId, req.user.id]
+                );
+            } else if (cascadeAction === 'orphan') {
+                db.run(
+                    `UPDATE records SET parent_id = NULL WHERE parent_id = ? AND user_id = ?`,
+                    [recordId, req.user.id]
+                );
             }
-        );
+
+            db.run('COMMIT;', function(err) {
+                if (err) {
+                    db.run('ROLLBACK;');
+                    return res.status(500).json({ error: '更新失败' });
+                }
+                res.json({ message: '记录已更新' });
+            });
+        });
     }
 });
 
+*/
+
+// Update Record (Full Edit)
+app.put('/api/records/:id', authenticateToken, (req, res) => {
+    const recordId = Number(req.params.id);
+    const { item_name, price, purchase_date, status, end_date, resale_price, parent_id, tags, depreciation_method, expected_lifespan, expected_salvage, cascadeAction } = req.body;
+    const normalizedPrice = Number(price);
+    const normalizedResale = Number(resale_price || 0);
+    const normalizedLifespan = Number(expected_lifespan || 1095);
+    const normalizedSalvage = Number(expected_salvage || 0);
+    const normalizedParentId = parent_id ? Number(parent_id) : null;
+
+    if (!item_name || price == null || !purchase_date) {
+        return res.status(400).json({ error: 'Please provide item name, price and purchase date.' });
+    }
+    if (!['active', 'broken', 'sold'].includes(status)) {
+        return res.status(400).json({ error: 'Invalid status.' });
+    }
+    if (!Number.isFinite(recordId) || recordId < 1) {
+        return res.status(400).json({ error: 'Invalid record id.' });
+    }
+    if (!Number.isFinite(normalizedPrice) || normalizedPrice < 0) {
+        return res.status(400).json({ error: 'Price must be a non-negative number.' });
+    }
+    if (!Number.isFinite(normalizedResale) || normalizedResale < 0 || normalizedResale > normalizedPrice) {
+        return res.status(400).json({ error: 'Resale price must be between 0 and item price.' });
+    }
+    if (!Number.isFinite(normalizedLifespan) || normalizedLifespan < 1) {
+        return res.status(400).json({ error: 'Expected lifespan must be at least 1 day.' });
+    }
+    if (!Number.isFinite(normalizedSalvage) || normalizedSalvage < 0 || normalizedSalvage > normalizedPrice) {
+        return res.status(400).json({ error: 'Expected salvage must be between 0 and item price.' });
+    }
+    if ((status === 'broken' || status === 'sold') && !end_date) {
+        return res.status(400).json({ error: 'End date is required for broken or sold records.' });
+    }
+    if (end_date && new Date(end_date) < new Date(purchase_date)) {
+        return res.status(400).json({ error: 'End date cannot be earlier than purchase date.' });
+    }
+    if (normalizedParentId === recordId) {
+        return res.status(400).json({ error: 'A record cannot be its own parent.' });
+    }
+
+    const executeUpdate = () => {
+        db.serialize(() => {
+            db.run('BEGIN TRANSACTION;');
+            db.run(
+                `UPDATE records SET item_name = ?, price = ?, purchase_date = ?, status = ?, end_date = ?, resale_price = ?, parent_id = ?, tags = ?, depreciation_method = ?, expected_lifespan = ?, expected_salvage = ? WHERE id = ? AND user_id = ?`,
+                [item_name, normalizedPrice, purchase_date, status, end_date || null, normalizedResale, normalizedParentId, tags || '', depreciation_method || 'straight_line', normalizedLifespan, normalizedSalvage, recordId, req.user.id],
+                function (err) {
+                    if (err) {
+                        db.run('ROLLBACK;');
+                        return res.status(500).json({ error: 'Failed to update record.' });
+                    }
+                    if (this.changes === 0) {
+                        db.run('ROLLBACK;');
+                        return res.status(404).json({ error: 'Record not found.' });
+                    }
+
+                    const finish = () => {
+                        db.run('COMMIT;', (commitErr) => {
+                            if (commitErr) {
+                                db.run('ROLLBACK;');
+                                return res.status(500).json({ error: 'Failed to commit record update.' });
+                            }
+                            res.json({ message: 'Record updated.' });
+                        });
+                    };
+
+                    if (cascadeAction === 'bundle') {
+                        db.run(
+                            `UPDATE records SET status = ?, end_date = ?, resale_price = 0 WHERE parent_id = ? AND user_id = ?`,
+                            [status, end_date || null, recordId, req.user.id],
+                            (cascadeErr) => {
+                                if (cascadeErr) {
+                                    db.run('ROLLBACK;');
+                                    return res.status(500).json({ error: 'Failed to update child records.' });
+                                }
+                                finish();
+                            }
+                        );
+                    } else if (cascadeAction === 'orphan') {
+                        db.run(
+                            `UPDATE records SET parent_id = NULL WHERE parent_id = ? AND user_id = ?`,
+                            [recordId, req.user.id],
+                            (orphanErr) => {
+                                if (orphanErr) {
+                                    db.run('ROLLBACK;');
+                                    return res.status(500).json({ error: 'Failed to detach child records.' });
+                                }
+                                finish();
+                            }
+                        );
+                    } else {
+                        finish();
+                    }
+                }
+            );
+        });
+    };
+
+    if (!normalizedParentId) return executeUpdate();
+
+    db.get(`SELECT COUNT(*) as count FROM records WHERE parent_id = ? AND user_id = ? AND is_deleted = 0`, [recordId, req.user.id], (childErr, childRow) => {
+        if (childErr) return res.status(500).json({ error: 'Failed to validate child records.' });
+        if (childRow && childRow.count > 0) {
+            return res.status(400).json({ error: 'A record with children cannot be nested under another record.' });
+        }
+
+        db.get(`SELECT id, parent_id FROM records WHERE id = ? AND user_id = ? AND is_deleted = 0`, [normalizedParentId, req.user.id], (parentErr, parentRow) => {
+            if (parentErr) return res.status(500).json({ error: 'Failed to validate parent record.' });
+            if (!parentRow) return res.status(400).json({ error: 'Parent record does not exist.' });
+            if (parentRow.parent_id) return res.status(400).json({ error: 'Only one nested level is supported.' });
+            executeUpdate();
+        });
+    });
+});
+
+/*
 // Import Records (Restore / Append)
 app.post('/api/records/import', authenticateToken, (req, res) => {
     const { mode, records } = req.body;
@@ -735,6 +1004,108 @@ app.post('/api/records/import', authenticateToken, (req, res) => {
 });
 
 
+
+*/
+
+// Import Records (Restore / Append)
+app.post('/api/records/import', authenticateToken, (req, res) => {
+    const { mode, records } = req.body;
+    if (!['append', 'overwrite'].includes(mode)) {
+        return res.status(400).json({ error: 'Invalid import mode.' });
+    }
+    if (!Array.isArray(records)) {
+        return res.status(400).json({ error: 'Invalid import records.' });
+    }
+
+    db.serialize(() => {
+        db.run('BEGIN TRANSACTION;');
+
+        const rollback = (message) => {
+            db.run('ROLLBACK;');
+            return res.status(500).json({ error: message });
+        };
+
+        const startImport = () => {
+            const oldToNewMap = {};
+            const parents = records.filter(r => !r.parent_id);
+            const children = records.filter(r => r.parent_id);
+
+            const insertRecord = (r, newParentId, callback) => {
+                const normalizedStatus = ['active', 'broken', 'sold'].includes(r.status) ? r.status : 'active';
+                const normalizedPrice = Number(r.price || 0);
+                const normalizedResale = Number(r.resale_price || 0);
+                const normalizedLifespan = Number(r.expected_lifespan || 1095);
+                const normalizedSalvage = Number(r.expected_salvage || 0);
+
+                if (!r.purchase_date) return callback(new Error('Record is missing purchase_date.'));
+                if (!Number.isFinite(normalizedPrice) || normalizedPrice < 0) return callback(new Error('Invalid price.'));
+                if (!Number.isFinite(normalizedResale) || normalizedResale < 0 || normalizedResale > normalizedPrice) return callback(new Error('Invalid resale price.'));
+                if (!Number.isFinite(normalizedLifespan) || normalizedLifespan < 1) return callback(new Error('Invalid lifespan.'));
+                if (!Number.isFinite(normalizedSalvage) || normalizedSalvage < 0 || normalizedSalvage > normalizedPrice) return callback(new Error('Invalid salvage value.'));
+
+                const sql = `
+                    INSERT INTO records (user_id, item_name, price, purchase_date, status, end_date, resale_price, parent_id, tags, depreciation_method, expected_lifespan, expected_salvage)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                `;
+                db.run(sql, [
+                    req.user.id,
+                    r.item_name || 'Untitled',
+                    normalizedPrice,
+                    r.purchase_date,
+                    normalizedStatus,
+                    r.end_date || null,
+                    normalizedResale,
+                    newParentId || null,
+                    r.tags || '',
+                    r.depreciation_method || 'straight_line',
+                    normalizedLifespan,
+                    normalizedSalvage
+                ], function (err) {
+                    if (err) return callback(err);
+                    callback(null, this.lastID);
+                });
+            };
+
+            const processParents = (index, done) => {
+                if (index >= parents.length) return done();
+                const parent = parents[index];
+                insertRecord(parent, null, (err, newId) => {
+                    if (err) return rollback('Failed to import parent records.');
+                    oldToNewMap[parent.id] = newId;
+                    processParents(index + 1, done);
+                });
+            };
+
+            const processChildren = (index, done) => {
+                if (index >= children.length) return done();
+                const child = children[index];
+                const mappedParentId = oldToNewMap[child.parent_id] || null;
+                insertRecord(child, mappedParentId, (err) => {
+                    if (err) return rollback('Failed to import child records.');
+                    processChildren(index + 1, done);
+                });
+            };
+
+            processParents(0, () => {
+                processChildren(0, () => {
+                    db.run('COMMIT;', (err) => {
+                        if (err) return rollback('Failed to commit import.');
+                        res.json({ message: 'Import completed.' });
+                    });
+                });
+            });
+        };
+
+        if (mode === 'overwrite') {
+            db.run('DELETE FROM records WHERE user_id = ?', [req.user.id], (deleteErr) => {
+                if (deleteErr) return rollback('Failed to clear existing records.');
+                startImport();
+            });
+        } else {
+            startImport();
+        }
+    });
+});
 
 // --- ADMIN APIs ---
 

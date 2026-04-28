@@ -1,7 +1,7 @@
 {
-  "name": "DayCost - 价值耗散监控器",
+  "name": "DayCost - 日均成本看板",
   "short_name": "DayCost",
-  "description": "实时监控个人资产价值耗散与日均生命成本",
+  "description": "记录个人资产投入、使用状态和日均摊销成本。",
   "start_url": "/",
   "display": "standalone",
   "orientation": "portrait",

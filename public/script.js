@@ -126,10 +126,12 @@ document.addEventListener('DOMContentLoaded', () => {
     let trashClusterizeInstance = null;
     let expandedParents = {};
     let globalTrashRecords = [];
+    let statsActiveView = 'tag';
+    let statsLinkedFilter = null;
 
     // --- Pagination State ---
     let currentPage = 1;
-    const itemsPerPage = 50;
+    const itemsPerPage = 10000; // Load all to preserve tree structure across pagination
     let hasMoreRecords = true;
     let isLoadingRecords = false;
 
@@ -174,6 +176,42 @@ document.addEventListener('DOMContentLoaded', () => {
             modal.classList.add('hidden');
             onOk();
         });
+        modal.classList.remove('hidden');
+    };
+
+    window.showAppChoice = function (title, msg, onBundle, onOrphan, onCancel) {
+        const modal = document.getElementById('customChoiceModal');
+        if (!modal) return;
+        document.getElementById('choiceTitle').innerText = title;
+        document.getElementById('choiceMessage').innerText = msg;
+
+        const bundleBtn = document.getElementById('choiceBundleBtn');
+        const orphanBtn = document.getElementById('choiceOrphanBtn');
+        const cancelBtn = document.getElementById('choiceCancelBtn');
+
+        const newBundle = bundleBtn.cloneNode(true);
+        const newOrphan = orphanBtn.cloneNode(true);
+        const newCancel = cancelBtn.cloneNode(true);
+        
+        bundleBtn.replaceWith(newBundle);
+        orphanBtn.replaceWith(newOrphan);
+        cancelBtn.replaceWith(newCancel);
+
+        newCancel.addEventListener('click', () => {
+            modal.classList.add('hidden');
+            if (onCancel) onCancel();
+        });
+        
+        newBundle.addEventListener('click', () => {
+            modal.classList.add('hidden');
+            onBundle();
+        });
+
+        newOrphan.addEventListener('click', () => {
+            modal.classList.add('hidden');
+            onOrphan();
+        });
+
         modal.classList.remove('hidden');
     };
 
@@ -244,6 +282,14 @@ document.addEventListener('DOMContentLoaded', () => {
         tabLogin.classList.remove('active');
         authSubmitBtn.textContent = '注册并登录';
         authError.classList.add('hidden');
+    });
+
+    // Clean labels for the repaired UTF-8 interface. Registered after legacy listeners so it wins.
+    tabLogin.addEventListener('click', () => {
+        authSubmitBtn.textContent = '登录';
+    });
+    tabRegister.addEventListener('click', () => {
+        authSubmitBtn.textContent = '注册并登录';
     });
 
     authForm.addEventListener('submit', async (e) => {
@@ -457,6 +503,23 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
 
+        if (!Number.isFinite(price) || price < 0) {
+            showAppAlert('金额必须是大于等于 0 的数字');
+            return;
+        }
+        if (resale_price < 0 || resale_price > price) {
+            showAppAlert('回血金额必须在 0 到购买金额之间');
+            return;
+        }
+        if (expected_lifespan < 1) {
+            showAppAlert('预计寿命至少为 1 天');
+            return;
+        }
+        if (expected_salvage < 0 || expected_salvage > price) {
+            showAppAlert('终期残值必须在 0 到购买金额之间');
+            return;
+        }
+
         // Preview calculation using chosen status
         const { dailyCost, actualDaysForCalc } = calculateCost({
             price,
@@ -578,21 +641,64 @@ document.addEventListener('DOMContentLoaded', () => {
         const expected_lifespan = parseInt(document.getElementById('statusEditExpectedLifespan').value) || 1095;
         const expected_salvage = parseFloat(document.getElementById('statusEditExpectedSalvage').value) || 0;
 
-        try {
-            const res = await fetch(`/api/records/${id}`, {
-                method: 'PUT',
-                headers: getHeaders(),
-                body: JSON.stringify({ item_name, price, purchase_date, status, end_date, resale_price, parent_id, tags, depreciation_method, expected_lifespan, expected_salvage })
-            });
-            const data = await res.json();
-            if (res.ok) {
-                statusModal.classList.add('hidden');
-                loadHistory();
-                loadStats();
-            } else {
-                showAppAlert(data.error || '更新失败');
-            }
-        } catch (err) { }
+        if (!Number.isFinite(price) || price < 0) {
+            showAppAlert('金额必须是大于等于 0 的数字');
+            return;
+        }
+        if ((status === 'broken' || status === 'sold') && !end_date) {
+            showAppAlert('已损坏或已回血的记录必须填写结束日期');
+            return;
+        }
+        if (end_date && new Date(end_date) < new Date(purchase_date)) {
+            showAppAlert('结束日期不能早于购买日期');
+            return;
+        }
+        if (resale_price < 0 || resale_price > price) {
+            showAppAlert('回血金额必须在 0 到购买金额之间');
+            return;
+        }
+        if (expected_lifespan < 1) {
+            showAppAlert('预计寿命至少为 1 天');
+            return;
+        }
+        if (expected_salvage < 0 || expected_salvage > price) {
+            showAppAlert('终期残值必须在 0 到购买金额之间');
+            return;
+        }
+
+        const submitUpdate = async (cascadeAction = 'none') => {
+            try {
+                const res = await fetch(`/api/records/${id}`, {
+                    method: 'PUT',
+                    headers: getHeaders(),
+                    body: JSON.stringify({ item_name, price, purchase_date, status, end_date, resale_price, parent_id, tags, depreciation_method, expected_lifespan, expected_salvage, cascadeAction })
+                });
+                const data = await res.json();
+                if (res.ok) {
+                    statusModal.classList.add('hidden');
+                    loadHistory();
+                    loadStats();
+                } else {
+                    showAppAlert(data.error || '更新失败');
+                }
+            } catch (err) { }
+        };
+
+        const record = globalRecords.find(r => r.id === parseInt(id));
+        const children = globalRecords.filter(r => r.parent_id === parseInt(id));
+        
+        if (record && children.length > 0 && record.status === 'active' && (status === 'broken' || status === 'sold')) {
+            const statusLabel = status === 'broken' ? '已损坏' : '已回血';
+            showAppChoice(
+                '级联处理',
+                `该组合下包含 ${children.length} 个子配件。\n主体被标记为「${statusLabel}」后，您希望如何处理这些子配件？`,
+                () => submitUpdate('bundle'),
+                () => submitUpdate('orphan'),
+                () => { /* cancel */ }
+            );
+        } else {
+            submitUpdate('none');
+        }
     });
 
     window.openStatusModal = function (id) {
@@ -655,7 +761,44 @@ document.addEventListener('DOMContentLoaded', () => {
     function updateParentDropdowns() {
         const topLevelRecords = globalRecords.filter(r => !r.parent_id);
         const optionsHtml = '<option value="">- 独立物品 -</option>' +
-            topLevelRecords.map(r => `<option value="${r.id}">${r.item_name}</option>`).join('');
+            topLevelRecords.map(r => `<option value="${r.id}">${escapeHtml(r.item_name || '未命名')}</option>`).join('');
+
+        parentSelect.innerHTML = optionsHtml;
+        statusEditParentId.innerHTML = optionsHtml;
+    }
+
+    window.deleteRecord = function (id) {
+        const record = globalRecords.find(r => r.id === id);
+        if (!record) return;
+
+        showAppConfirm(
+            '移入回收站？',
+            `确定要将「${record.item_name}」移入回收站吗？\n如果它还有子配件，请先解除绑定或移动子配件。`,
+            async () => {
+                try {
+                    const res = await fetch(`/api/records/${id}`, {
+                        method: 'DELETE',
+                        headers: getHeaders()
+                    });
+                    const data = await res.json();
+                    if (res.ok) {
+                        loadHistory();
+                        loadStats();
+                    } else {
+                        showAppAlert(data.error || '删除失败');
+                    }
+                } catch (e) {
+                    showAppAlert('操作失败');
+                }
+            },
+            '确认删除'
+        );
+    };
+
+    function updateParentDropdowns() {
+        const topLevelRecords = globalRecords.filter(r => !r.parent_id);
+        const optionsHtml = '<option value="">- 独立物品 -</option>' +
+            topLevelRecords.map(r => `<option value="${r.id}">${escapeHtml(r.item_name || '未命名')}</option>`).join('');
 
         parentSelect.innerHTML = optionsHtml;
         statusEditParentId.innerHTML = optionsHtml;
@@ -666,14 +809,18 @@ document.addEventListener('DOMContentLoaded', () => {
         const globalTotalDaily = document.getElementById('globalTotalDaily');
         const globalTotalPrice = document.getElementById('globalTotalPrice');
 
+        const queryParams = new URLSearchParams({
+            q: searchInput.value,
+            status: filterSelect.value
+        });
+
         try {
-            const res = await fetch('/api/stats', { headers: getHeaders() });
+            const res = await fetch(`/api/stats?${queryParams.toString()}`, { headers: getHeaders() });
             if (!res.ok) return;
             const stats = await res.json();
 
             if (stats.total_count === 0) {
-                if (globalStatsBox) globalStatsBox.classList.add('hidden');
-                return;
+                // Do not hide the box, just show zero so layout doesn't break
             }
 
             if (globalStatsBox) globalStatsBox.classList.remove('hidden');
@@ -719,6 +866,35 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             }
 
+            if (tagContainer && stats.tag_stats) {
+                const cleanTagEntries = Object.entries(stats.tag_stats)
+                    .map(([name, data]) => ({ name, ...data }))
+                    .sort((a, b) => b.daily_cost - a.daily_cost);
+
+                if (cleanTagEntries.length === 0) {
+                    tagContainer.innerHTML = '<div class="empty-state">暂无标签数据。给物品添加标签后会在这里汇总。</div>';
+                } else {
+                    const maxDailyCost = cleanTagEntries[0].daily_cost;
+                    tagContainer.innerHTML = cleanTagEntries.map(tag => {
+                        const percent = maxDailyCost > 0 ? (tag.daily_cost / maxDailyCost) * 100 : 0;
+                        return `
+                            <div class="tag-list-item">
+                                <div class="tag-list-header">
+                                    <span class="tag-list-name">#${escapeHtml(tag.name)}</span>
+                                    <span class="tag-list-cost">¥${tag.daily_cost.toFixed(2)}<span style="font-size:0.7rem; color:#94a3b8;">/天</span></span>
+                                </div>
+                                <div class="tag-progress-track">
+                                    <div class="tag-progress-fill" style="width: ${percent}%;"></div>
+                                </div>
+                                <div class="tag-list-sub" style="margin-top: 4px; text-align: right;">
+                                    包含投入：¥${tag.total_price.toFixed(2)}
+                                </div>
+                            </div>
+                        `;
+                    }).join('');
+                }
+            }
+
         } catch (e) {
             console.error("加载统计数据失败", e);
         }
@@ -742,8 +918,11 @@ document.addEventListener('DOMContentLoaded', () => {
             const sortOrder = sortSelect.value.toLowerCase().includes('asc') ? 'ASC' : 'DESC';
             const query = (searchInput.value || '').trim();
             const filter = filterSelect.value;
+            const statsParams = statsLinkedFilter
+                ? `&statsType=${encodeURIComponent(statsLinkedFilter.type)}&statsValue=${encodeURIComponent(statsLinkedFilter.value)}`
+                : '';
 
-            const res = await fetch(`/api/records?page=${page}&limit=${itemsPerPage}&sortBy=${sortBy}&sortOrder=${sortOrder}&q=${encodeURIComponent(query)}&status=${filter}`, {
+            const res = await fetch(`/api/records?page=${page}&limit=${itemsPerPage}&sortBy=${sortBy}&sortOrder=${sortOrder}&q=${encodeURIComponent(query)}&status=${filter}${statsParams}`, {
                 headers: getHeaders()
             });
 
@@ -798,6 +977,8 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     filterSelect.addEventListener('change', () => {
+        statsLinkedFilter = null;
+        updateStatsControls();
         currentPage = 1;
         loadHistory(1, false);
     });
@@ -806,6 +987,8 @@ document.addEventListener('DOMContentLoaded', () => {
         loadHistory(1, false);
     });
     searchInput.addEventListener('input', () => {
+        statsLinkedFilter = null;
+        updateStatsControls();
         // Search still happens locally for now for responsiveness, 
         // but we could move it to server if needed. 
         // For infinite scroll, server-side search is better.
@@ -827,15 +1010,24 @@ document.addEventListener('DOMContentLoaded', () => {
 
         let badges = '';
         let tagBadges = '';
-        let metaHtml = `个体总价 ￥${record.price.toFixed(2)}${isChild ? '' : ` · 已用 ${record._days} 天`}`;
+
+        const dailyCost = record._aggDailyCost !== undefined ? record._aggDailyCost : record._dailyCost;
+        const price = record._aggPrice !== undefined ? record._aggPrice : record.price;
+        const days = record._aggDays !== undefined ? record._aggDays : record._days;
+        const finalCost = record._aggFinalCost !== undefined ? record._aggFinalCost : record._finalCost;
+        const currentValue = record._aggCurrentValue !== undefined ? record._aggCurrentValue : record._currentValue;
+
+        const priceLabel = isChild ? '零件单价' : '组合总价';
+        let metaHtml = `${priceLabel} ￥${price.toFixed(2)}${isChild ? '' : ` · 已用 ${days} 天`}`;
 
         if (status === 'broken') {
             badges = '<span class="status-badge bg-red">已损坏</span>';
         } else if (status === 'sold') {
             badges = '<span class="status-badge bg-yellow">已回血</span>';
-            metaHtml = `个体积压 ￥${record._finalCost.toFixed(2)} (售￥${record.resale_price}) · 定格 ${record._days}天`;
+            const resaleLabel = isChild ? '零件折损' : '组合折损';
+            metaHtml = `${resaleLabel} ￥${finalCost.toFixed(2)} (售￥${record.resale_price}) · 定格 ${days}天`;
         } else {
-            metaHtml += ` · 估值 ￥${(record._currentValue || 0).toFixed(2)}`;
+            metaHtml += ` · 估值 ￥${(currentValue || 0).toFixed(2)}`;
         }
 
         if (record.tags) {
@@ -855,7 +1047,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             <span class="history-meta" data-fulltext="${metaHtml.replace(/￥/g, '\xA5')}">${metaHtml}</span>
                         </div>
                         <div class="history-cost">
-                            <div class="history-cost-val">￥${record._dailyCost.toFixed(2)}<span>/天</span></div>
+                            <div class="history-cost-val">￥${dailyCost.toFixed(2)}<span>/天</span></div>
                         </div>
                     </div>
                     <div class="swipe-actions">
@@ -867,112 +1059,111 @@ document.addEventListener('DOMContentLoaded', () => {
         `;
     }
 
+    function escapeHtml(value) {
+        return String(value ?? '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    }
+
+    function formatCurrency(value) {
+        const number = Number(value) || 0;
+        return `¥${number.toFixed(2)}`;
+    }
+
+    function createItemHtml(record, isChild = false) {
+        const status = record.status || 'active';
+        let classModifiers = isChild ? 'child-item' : '';
+        if (status === 'broken') classModifiers += ' broken';
+        if (status === 'sold') classModifiers += ' sold';
+
+        let badges = '';
+        let tagBadges = '';
+
+        const dailyCost = record._aggDailyCost !== undefined ? record._aggDailyCost : record._dailyCost;
+        const price = record._aggPrice !== undefined ? record._aggPrice : record.price;
+        const days = record._aggDays !== undefined ? record._aggDays : record._days;
+        const finalCost = record._aggFinalCost !== undefined ? record._aggFinalCost : record._finalCost;
+        const currentValue = record._aggCurrentValue !== undefined ? record._aggCurrentValue : record._currentValue;
+
+        const priceLabel = isChild ? '零件单价' : '组合总价';
+        let metaText = `${priceLabel} ${formatCurrency(price)}${isChild ? '' : ` · 已用 ${days || 0} 天`}`;
+
+        if (status === 'broken') {
+            badges = '<span class="status-badge bg-red">已损坏</span>';
+        } else if (status === 'sold') {
+            badges = '<span class="status-badge bg-yellow">已回血</span>';
+            const resaleLabel = isChild ? '零件折损' : '组合折损';
+            metaText = `${resaleLabel} ${formatCurrency(finalCost)} · 回血 ${formatCurrency(record.resale_price || 0)} · ${days || 0} 天`;
+        } else {
+            metaText += ` · 估值 ${formatCurrency(currentValue || 0)}`;
+        }
+
+        if (record.tags) {
+            const tagsArr = record.tags.split(/[,，\s]+/).map(t => t.trim()).filter(t => t);
+            tagsArr.forEach(t => {
+                const cleanTag = t.startsWith('#') ? t : '#' + t;
+                tagBadges += `<span class="tag-badge">${escapeHtml(cleanTag)}</span>`;
+            });
+        }
+
+        const safeName = escapeHtml(record.item_name || '未命名');
+        const safeMeta = escapeHtml(metaText);
+
+        return `
+            <div class="history-item ${classModifiers}" data-id="${record.id}">
+                <div class="swipe-wrapper" ontouchstart="handleSwipeStart(event)" ontouchmove="handleSwipeMove(event)" ontouchend="handleSwipeEnd(event)">
+                    <div class="swipe-content">
+                        <div class="history-info">
+                            <span class="history-name" data-fulltext="${safeName}">${safeName} ${badges}${tagBadges}</span>
+                            <span class="history-meta" data-fulltext="${safeMeta}">${safeMeta}</span>
+                        </div>
+                        <div class="history-cost">
+                            <div class="history-cost-val">${formatCurrency(dailyCost)}<span>/天</span></div>
+                        </div>
+                    </div>
+                    <div class="swipe-actions">
+                        <button class="status-btn" onclick="openStatusModal(${record.id})" title="编辑">编辑</button>
+                        ${isChild ? '' : `<button class="delete-btn" onclick="deleteRecord(${record.id})" title="删除">删除</button>`}
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
     function renderHistory() {
         const globalStatsBox = document.getElementById('globalStatsBox');
-        const globalTotalDaily = document.getElementById('globalTotalDaily');
-        const globalTotalPrice = document.getElementById('globalTotalPrice');
 
-        if (globalRecords.length === 0 && globalStatsBox) {
-            globalStatsBox.classList.add('hidden');
-        } else if (globalStatsBox) {
+        // Removed logic that hides globalStatsBox when records are empty
+        if (globalStatsBox) {
             globalStatsBox.classList.remove('hidden');
         }
 
-        const processedRecords = globalRecords.map(r => {
-            const clone = { ...r };
-            const costs = calculateCost(clone);
-            clone._dailyCost = costs.dailyCost;
-            clone._days = costs.actualDaysForCalc;
-            clone._finalCost = costs.finalCost;
-            clone._currentValue = costs.currentValue;
-            return clone;
-        });
-
-        // 2. Separate into parents and children (Still needed for tree rendering)
+        // Server already sends processed and sorted data in `globalRecords`!
+        // We just need to separate them into top-level and children for UI expansion.
         const childrenMap = {}; // parent_id -> array of children
         const topLevelRecords = [];
 
-        processedRecords.forEach(r => {
+        globalRecords.forEach(r => {
             if (r.parent_id) {
-                // Check if the parent actually exists in the current filtered dataset
-                const hasParent = processedRecords.some(p => p.id === r.parent_id);
-                if (hasParent) {
-                    if (!childrenMap[r.parent_id]) childrenMap[r.parent_id] = [];
-                    childrenMap[r.parent_id].push(r);
-                } else {
-                    // Orphaned due to server-side filtering (e.g. parent is active, child is broken)
-                    // Promote to top level so it is visible
-                    topLevelRecords.push(r);
-                }
+                if (!childrenMap[r.parent_id]) childrenMap[r.parent_id] = [];
+                childrenMap[r.parent_id].push(r);
             } else {
                 topLevelRecords.push(r);
             }
         });
 
-        // 3. FULL AGGREGATION: Aggregate costs into all parents before filtering!
-        // This ensures a parent's cost is always correct even if some children are filtered out of view.
-        topLevelRecords.forEach(parent => {
-            parent._aggDailyCost = parent._dailyCost;
-            parent._aggFinalCost = parent._finalCost;
-            parent._aggPrice = parent.price;
-            parent._aggCurrentValue = parent._currentValue;
-            let aggMaxDays = parent._days;
-
-            const children = childrenMap[parent.id] || [];
-            children.forEach(child => {
-                parent._aggDailyCost += child._dailyCost;
-                parent._aggFinalCost += child._finalCost;
-                parent._aggPrice += child.price;
-                parent._aggCurrentValue += child._currentValue;
-                if (child._days > aggMaxDays) {
-                    aggMaxDays = child._days;
-                }
-            });
-
-            // To work with existing sorting logic seamlessly
-            parent._dailyCost = parent._aggDailyCost;
-            parent.price = parent._aggPrice;
-            parent._finalCost = parent._aggFinalCost;
-            parent._currentValue = parent._aggCurrentValue;
-            parent._days = aggMaxDays;
-        });
-
-        // 4. Apply Advanced Tree Filtering - Removed (Moved to Server)
-
-        let sortedRecords = [];
-        const filteredChildrenMap = {}; // We will only render children inside this map!
-
-        topLevelRecords.forEach(parent => {
-            const allChildren = childrenMap[parent.id] || [];
-
-            // In pagination mode, we assume server returned everything matching the current filter.
-            // We only keep the parent if it's top-level. 
-            sortedRecords.push(parent);
-            filteredChildrenMap[parent.id] = allChildren;
-        });
-
-        // 5. Sorting
-        const sortMode = sortSelect.value;
-        const sortFn = (a, b) => {
-            if (sortMode === 'costDesc') return b._dailyCost - a._dailyCost;
-            if (sortMode === 'costAsc') return a._dailyCost - b._dailyCost;
-            if (sortMode === 'priceDesc') return b.price - a.price;
-            if (sortMode === 'daysDesc') return b._days - a._days;
-            if (sortMode === 'daysAsc') return a._days - b._days;
-            return b.id - a.id;
-        };
-
-        sortedRecords.sort(sortFn);
-
         // 6. Rendering (Virtual List via Clusterize)
         let virtualRows = [];
 
-        if (sortedRecords.length === 0) {
+        if (topLevelRecords.length === 0) {
             virtualRows.push('<div class="clusterize-no-data" style="text-align:center; color:#94a3b8; padding: 20px;">没有符合条件的记录</div>');
         } else {
-            sortedRecords.forEach(record => {
-                const children = filteredChildrenMap[record.id] || [];
-                if (children.length > 0) children.sort(sortFn);
+            topLevelRecords.forEach(record => {
+                const children = childrenMap[record.id] || [];
+                // Children come sorted from the backend!
 
                 // Push parent row
                 virtualRows.push(`<div class="record-wrapper">${createItemHtml(record, false)}</div>`);
@@ -1015,6 +1206,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         // 7. Render Visualization Charts
+        renderStatsBreakdown();
         renderChart();
         renderTrendChart(currentTrendRange);
     }
@@ -1026,10 +1218,16 @@ document.addEventListener('DOMContentLoaded', () => {
         const chartTitle = document.getElementById('chartTitle');
         const chartBackBtn = document.getElementById('chartBackBtn');
 
-        let url = '/api/stats/pie';
+        const queryParams = new URLSearchParams({
+            q: searchInput.value,
+            status: filterSelect.value
+        });
+        
         if (chartCurrentParentId) {
-            url += `?parent_id=${chartCurrentParentId}`;
+            queryParams.append('parent_id', chartCurrentParentId);
         }
+        
+        let url = `/api/stats/pie?${queryParams.toString()}`;
 
         try {
             const res = await fetch(url, { headers: getHeaders() });
@@ -1116,7 +1314,12 @@ document.addEventListener('DOMContentLoaded', () => {
         });
 
         try {
-            const res = await fetch(`/api/stats/trend?range=${range}`, { headers: getHeaders() });
+            const queryParams = new URLSearchParams({
+                range: range,
+                q: searchInput.value,
+                status: filterSelect.value
+            });
+            const res = await fetch(`/api/stats/trend?${queryParams.toString()}`, { headers: getHeaders() });
             if (!res.ok) return;
             const trendData = await res.json();
 
@@ -1512,6 +1715,542 @@ document.addEventListener('DOMContentLoaded', () => {
         }, '确认物理删除');
     };
     
+    // --- Stats dimension views and list linkage ---
+    const statsViewMeta = {
+        tag: { title: '标签日均成本分布', empty: '暂无标签数据。给物品添加标签后会在这里汇总。' },
+        status: { title: '状态日均成本分布', empty: '暂无状态数据。' },
+        group: { title: '组合日均成本分布', empty: '暂无组合数据。' },
+        month: { title: '月份投入分布', empty: '暂无月份数据。' }
+    };
+
+    const statusLabels = { active: '使用中', broken: '已损坏', sold: '已回血' };
+
+    function recordDailyCost(record) {
+        return Number(record._aggDailyCost ?? record._dailyCost ?? 0);
+    }
+
+    function recordPrice(record) {
+        return Number(record._aggPrice ?? record.price ?? 0);
+    }
+
+    function topLevelStatsRecords() {
+        return globalRecords.filter(r => !r.parent_id);
+    }
+
+    function addStatsBucket(map, key, label, record, metric = 'daily') {
+        if (!key) return;
+        if (!map.has(key)) {
+            map.set(key, { key, label, dailyCost: 0, totalPrice: 0, count: 0 });
+        }
+        const bucket = map.get(key);
+        bucket.dailyCost += recordDailyCost(record);
+        bucket.totalPrice += recordPrice(record);
+        bucket.count += 1;
+        if (metric === 'price') bucket.value = bucket.totalPrice;
+        else bucket.value = bucket.dailyCost;
+    }
+
+    function getStatsBuckets(view = statsActiveView) {
+        const buckets = new Map();
+        const records = view === 'group' ? topLevelStatsRecords() : globalRecords;
+
+        records.forEach(record => {
+            if (view === 'tag') {
+                const tags = (record.tags || '').split(/[,，\s]+/).map(t => t.trim().replace(/^#/, '')).filter(Boolean);
+                tags.forEach(tag => addStatsBucket(buckets, tag.toLowerCase(), `#${tag}`, record));
+            } else if (view === 'status') {
+                const key = record.status || 'active';
+                addStatsBucket(buckets, key, statusLabels[key] || key, record);
+            } else if (view === 'group') {
+                addStatsBucket(buckets, String(record.id), record.item_name || '未命名组合', record);
+            } else if (view === 'month') {
+                const month = String(record.purchase_date || '').slice(0, 7);
+                addStatsBucket(buckets, month, month, record, 'price');
+            }
+        });
+
+        return [...buckets.values()]
+            .map(bucket => ({ ...bucket, value: bucket.value ?? bucket.dailyCost }))
+            .filter(bucket => bucket.value > 0)
+            .sort((a, b) => b.value - a.value);
+    }
+
+    function statsFilterLabel(filter = statsLinkedFilter) {
+        if (!filter) return '当前图表跟随账本列表筛选。';
+        const label = filter.label || filter.value;
+        const viewLabel = ({ tag: '标签', status: '状态', group: '组合', month: '月份' })[filter.type] || '筛选';
+        return `已联动筛选：${viewLabel} ${label}`;
+    }
+
+    function updateStatsControls() {
+        document.querySelectorAll('[data-stats-view]').forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.statsView === statsActiveView);
+        });
+        const title = document.getElementById('statsBreakdownTitle');
+        if (title) title.textContent = statsViewMeta[statsActiveView]?.title || '统计分布';
+        const label = document.getElementById('statsLinkLabel');
+        if (label) label.textContent = statsFilterLabel();
+    }
+
+    function applyStatsFilter(type, value, label) {
+        statsLinkedFilter = { type, value, label };
+        if (type === 'status') {
+            filterSelect.value = value;
+            searchInput.value = '';
+        } else {
+            filterSelect.value = 'all';
+            searchInput.value = '';
+        }
+        updateStatsControls();
+        loadHistory(1, false);
+    }
+
+    function clearStatsFilter() {
+        statsLinkedFilter = null;
+        filterSelect.value = 'all';
+        searchInput.value = '';
+        updateStatsControls();
+        loadHistory(1, false);
+    }
+
+    function renderStatsBreakdown() {
+        updateStatsControls();
+        const container = document.getElementById('tagStatsContainer');
+        if (!container) return;
+
+        const buckets = getStatsBuckets();
+        const meta = statsViewMeta[statsActiveView] || statsViewMeta.tag;
+
+        if (buckets.length === 0) {
+            container.innerHTML = `<div class="empty-state">${meta.empty}</div>`;
+            return;
+        }
+
+        const maxValue = buckets[0].value;
+        container.innerHTML = buckets.map(bucket => {
+            const percent = maxValue > 0 ? (bucket.value / maxValue) * 100 : 0;
+            const isActive = statsLinkedFilter?.type === statsActiveView && String(statsLinkedFilter.value) === String(bucket.key);
+            const mainValue = statsActiveView === 'month' ? formatCurrency(bucket.totalPrice) : `${formatCurrency(bucket.dailyCost)}<span style="font-size:0.7rem; color:#94a3b8;">/天</span>`;
+            const subValue = statsActiveView === 'month'
+                ? `${bucket.count} 条记录`
+                : `${bucket.count} 条 · 总投入 ${formatCurrency(bucket.totalPrice)}`;
+            return `
+                <div class="tag-list-item ${isActive ? 'active' : ''}" data-stats-key="${escapeHtml(bucket.key)}" data-stats-label="${escapeHtml(bucket.label)}">
+                    <div class="tag-list-header">
+                        <span class="tag-list-name">${escapeHtml(bucket.label)}</span>
+                        <span class="tag-list-cost">${mainValue}</span>
+                    </div>
+                    <div class="tag-progress-track">
+                        <div class="tag-progress-fill" style="width: ${percent}%;"></div>
+                    </div>
+                    <div class="tag-list-sub">${subValue}</div>
+                </div>
+            `;
+        }).join('');
+
+        container.querySelectorAll('[data-stats-key]').forEach(item => {
+            item.addEventListener('click', () => {
+                applyStatsFilter(statsActiveView, item.dataset.statsKey, item.dataset.statsLabel);
+            });
+        });
+    }
+
+    renderChart = async function () {
+        const ctx = document.getElementById('costChart');
+        if (!ctx) return;
+
+        const buckets = getStatsBuckets();
+        const chartTitle = document.getElementById('chartTitle');
+        const chartBackBtn = document.getElementById('chartBackBtn');
+        if (chartBackBtn) chartBackBtn.classList.add('hidden');
+        if (chartTitle) chartTitle.innerText = statsViewMeta[statsActiveView]?.title || '统计分布';
+
+        if (costChartInstance) costChartInstance.destroy();
+        if (buckets.length === 0) {
+            ctx.classList.add('hidden');
+            return;
+        }
+        ctx.classList.remove('hidden');
+
+        costChartInstance = new Chart(ctx, {
+            type: statsActiveView === 'month' ? 'bar' : 'doughnut',
+            data: {
+                labels: buckets.map(b => b.label),
+                datasets: [{
+                    data: buckets.map(b => Number(b.value.toFixed(2))),
+                    backgroundColor: [
+                        'rgba(59, 130, 246, 0.8)', 'rgba(16, 185, 129, 0.8)',
+                        'rgba(245, 158, 11, 0.8)', 'rgba(239, 68, 68, 0.8)',
+                        'rgba(167, 139, 250, 0.8)', 'rgba(148, 163, 184, 0.8)'
+                    ],
+                    borderColor: 'rgba(15, 23, 42, 1)',
+                    borderWidth: 2
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                onClick: (event, elements) => {
+                    if (!elements.length) return;
+                    const bucket = buckets[elements[0].index];
+                    applyStatsFilter(statsActiveView, bucket.key, bucket.label);
+                },
+                plugins: {
+                    legend: { position: 'right', labels: { color: '#cbd5e1', font: { size: 11 } } },
+                    tooltip: {
+                        callbacks: {
+                            label: (context) => {
+                                const suffix = statsActiveView === 'month' ? '' : ' / 天';
+                                return ` ${formatCurrency(context.parsed.y ?? context.parsed)}${suffix}`;
+                            }
+                        }
+                    }
+                },
+                scales: statsActiveView === 'month' ? {
+                    x: { ticks: { color: '#94a3b8' }, grid: { display: false } },
+                    y: { ticks: { color: '#94a3b8' }, grid: { color: 'rgba(255,255,255,0.06)' }, beginAtZero: true }
+                } : undefined,
+                cutout: statsActiveView === 'month' ? undefined : '70%'
+            }
+        });
+    };
+
+    renderTrendChart = async function (range = currentTrendRange) {
+        const ctx = document.getElementById('trendChart');
+        if (!ctx) return;
+        currentTrendRange = range;
+
+        document.querySelectorAll('.trend-btn').forEach(btn => {
+            btn.classList.toggle('active', btn.getAttribute('data-range') === range);
+        });
+
+        const monthBuckets = getStatsBuckets('month').sort((a, b) => a.key.localeCompare(b.key));
+        const labels = monthBuckets.map(b => b.label);
+        const values = monthBuckets.map(b => Number(b.totalPrice.toFixed(2)));
+
+        if (trendChartInstance) trendChartInstance.destroy();
+        if (values.length === 0) {
+            ctx.classList.add('hidden');
+            return;
+        }
+        ctx.classList.remove('hidden');
+
+        trendChartInstance = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels,
+                datasets: [{
+                    label: '月度投入（元）',
+                    data: values,
+                    borderColor: 'rgba(96, 165, 250, 1)',
+                    backgroundColor: 'rgba(96, 165, 250, 0.1)',
+                    borderWidth: 2,
+                    pointBackgroundColor: 'rgba(15, 23, 42, 1)',
+                    pointBorderColor: 'rgba(96, 165, 250, 1)',
+                    fill: true,
+                    tension: 0.35
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                onClick: (event, elements) => {
+                    if (!elements.length) return;
+                    const bucket = monthBuckets[elements[0].index];
+                    applyStatsFilter('month', bucket.key, bucket.label);
+                },
+                plugins: {
+                    legend: { display: false },
+                    tooltip: { callbacks: { label: context => ` ${formatCurrency(context.parsed.y)}` } }
+                },
+                scales: {
+                    x: { grid: { display: false }, ticks: { color: '#94a3b8', maxTicksLimit: 8 } },
+                    y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#94a3b8' }, beginAtZero: true }
+                }
+            }
+        });
+    };
+
+    document.querySelectorAll('[data-stats-view]').forEach(btn => {
+        btn.addEventListener('click', () => {
+            statsActiveView = btn.dataset.statsView || 'tag';
+            updateStatsControls();
+            renderStatsBreakdown();
+            renderChart();
+        });
+    });
+
+    const statsClearFilterBtn = document.getElementById('statsClearFilterBtn');
+    if (statsClearFilterBtn) {
+        statsClearFilterBtn.addEventListener('click', clearStatsFilter);
+    }
+
+    // --- Clean UI overrides for repaired UTF-8 interface ---
+    function cloneButtonWithHandler(button, handler) {
+        if (!button) return null;
+        const clone = button.cloneNode(true);
+        button.replaceWith(clone);
+        clone.addEventListener('click', handler);
+        return clone;
+    }
+
+    function downloadTextFile(content, filename, mime = 'text/plain;charset=utf-8') {
+        const blob = new Blob([content], { type: mime });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+    }
+
+    cloneButtonWithHandler(document.getElementById('exportCsvBtn'), () => {
+        if (!globalRecords || globalRecords.length === 0) {
+            showAppAlert('没有可导出的数据');
+            return;
+        }
+
+        const headers = ['ID', '归属组合ID', '物品名称', '花费金额', '购买日期', '状态', '记录时间', '结束日期', '回血金额', '日均成本', '总天数', '最终折算金额'];
+        const statusMap = { active: '使用中', broken: '已损坏', sold: '已回血' };
+        const rows = globalRecords.map(r => [
+            r.id,
+            r.parent_id || '',
+            `"${String(r.item_name || '').replace(/"/g, '""')}"`,
+            r.price,
+            r.purchase_date,
+            statusMap[r.status] || '使用中',
+            r.created_at,
+            r.end_date || '',
+            r.resale_price || 0,
+            r._dailyCost?.toFixed(2) || '',
+            r._days || '',
+            r._finalCost?.toFixed(2) || ''
+        ]);
+
+        const csv = '\uFEFF' + [headers.join(','), ...rows.map(row => row.join(','))].join('\r\n');
+        downloadTextFile(csv, `DayCost_Export_${new Date().toISOString().split('T')[0]}.csv`, 'text/csv;charset=utf-8');
+    });
+
+    cloneButtonWithHandler(document.getElementById('backupExportBtn'), () => {
+        if (!globalRecords || globalRecords.length === 0) {
+            showAppAlert('没有可导出的数据');
+            return;
+        }
+
+        const cleanRecords = globalRecords.map(r => {
+            const clean = { ...r };
+            Object.keys(clean).forEach(key => {
+                if (key.startsWith('_')) delete clean[key];
+            });
+            return clean;
+        });
+
+        downloadTextFile(
+            JSON.stringify(cleanRecords, null, 2),
+            `DayCost_Backup_${new Date().toISOString().split('T')[0]}.daycost`,
+            'application/json;charset=utf-8'
+        );
+    });
+
+    cloneButtonWithHandler(document.getElementById('backupImportBtn'), () => {
+        importFileInput.value = '';
+        importFileInput.click();
+    });
+
+    const cleanImportFileInput = document.getElementById('importFileInput');
+    if (cleanImportFileInput) {
+        const clonedInput = cleanImportFileInput.cloneNode(true);
+        cleanImportFileInput.replaceWith(clonedInput);
+        clonedInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = (evt) => {
+                try {
+                    const json = JSON.parse(evt.target.result);
+                    if (!Array.isArray(json)) throw new Error('备份文件格式无效');
+                    tempDataToImport = json;
+                    importChoiceModal.classList.remove('hidden');
+                } catch (err) {
+                    showAppAlert('解析备份文件失败：' + err.message);
+                }
+            };
+            reader.readAsText(file);
+        });
+    }
+
+    cloneButtonWithHandler(document.getElementById('backupImportBtn'), () => {
+        const input = document.getElementById('importFileInput');
+        if (!input) return;
+        input.value = '';
+        input.click();
+    });
+
+    async function executeCleanImport(mode) {
+        importChoiceModal.classList.add('hidden');
+        if (!tempDataToImport) return;
+
+        try {
+            const res = await fetch('/api/records/import', {
+                method: 'POST',
+                headers: getHeaders(),
+                body: JSON.stringify({ mode, records: tempDataToImport })
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || '导入失败');
+
+            showAppAlert('数据导入成功', 'success');
+            loadHistory();
+            loadStats();
+        } catch (err) {
+            showAppAlert(err.message || '导入请求失败');
+        } finally {
+            tempDataToImport = null;
+        }
+    }
+
+    cloneButtonWithHandler(document.getElementById('importCancelBtn'), () => {
+        importChoiceModal.classList.add('hidden');
+        tempDataToImport = null;
+    });
+    cloneButtonWithHandler(document.getElementById('importOverwriteBtn'), () => executeCleanImport('overwrite'));
+    cloneButtonWithHandler(document.getElementById('importAppendBtn'), () => executeCleanImport('append'));
+
+    function renderTrash() {
+        const trashRows = globalTrashRecords.map(record => {
+            const deletedDate = new Date(record.deleted_at);
+            const now = new Date();
+            const diffDays = Math.floor((now - deletedDate) / (1000 * 60 * 60 * 24));
+            const daysLeft = Math.max(0, 30 - diffDays);
+            let countdownClass = 'status-badge';
+            if (daysLeft <= 3) countdownClass += ' bg-red';
+            else if (daysLeft <= 7) countdownClass += ' bg-yellow';
+            else countdownClass += ' bg-blue';
+
+            return `
+                <div class="record-wrapper">
+                    <div class="history-item deleted">
+                        <div class="history-info">
+                            <span class="history-name">${escapeHtml(record.item_name || '未命名')} <span class="${countdownClass}">${daysLeft}天后清理</span></span>
+                            <span class="history-meta">买入 ${formatCurrency(record.price)} · 删除于 ${record.deleted_at ? record.deleted_at.split(' ')[0] : '未知'}</span>
+                        </div>
+                        <div class="history-actions" style="display:flex; gap:8px;">
+                            <button class="status-btn" onclick="restoreRecord(${record.id})" title="恢复记录">恢复</button>
+                            <button class="delete-btn" onclick="purgeRecord(${record.id})" title="永久删除">删除</button>
+                        </div>
+                    </div>
+                </div>
+            `;
+        });
+
+        if (trashRows.length === 0) {
+            trashRows.push('<div class="empty-state">回收站为空</div>');
+        }
+
+        if (!trashClusterizeInstance) {
+            trashClusterizeInstance = new Clusterize({
+                rows: trashRows,
+                scrollId: 'trashListScroll',
+                contentId: 'trashListContent'
+            });
+        } else {
+            trashClusterizeInstance.update(trashRows);
+        }
+    }
+
+    window.restoreRecord = async function (id) {
+        try {
+            const res = await fetch(`/api/records/restore/${id}`, { method: 'POST', headers: getHeaders() });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || '恢复失败');
+
+            showAppAlert('记录已恢复', 'success');
+            loadTrash();
+            loadHistory();
+            loadStats();
+        } catch (err) {
+            showAppAlert(err.message || '恢复失败');
+        }
+    };
+
+    window.purgeRecord = function (id) {
+        showAppConfirm('永久删除？', '此操作无法撤销，记录会被永久移除。', async () => {
+            try {
+                const res = await fetch(`/api/records/purge/${id}`, { method: 'DELETE', headers: getHeaders() });
+                const data = await res.json().catch(() => ({}));
+                if (!res.ok) throw new Error(data.error || '永久删除失败');
+
+                showAppAlert('记录已永久删除', 'success');
+                loadTrash();
+            } catch (err) {
+                showAppAlert(err.message || '永久删除失败');
+            }
+        }, '永久删除');
+    };
+
+    window.loadAdminUsers = async function() {
+        const tbody = document.getElementById('adminUsersList');
+        if (!tbody) return;
+
+        tbody.innerHTML = '<tr><td colspan="7" class="empty-state">数据加载中...</td></tr>';
+
+        try {
+            const res = await fetch('/api/admin/users', { headers: getHeaders() });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || '获取用户列表失败');
+
+            if (!data.data || data.data.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="7" class="empty-state">暂无用户数据</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = '';
+            data.data.forEach(u => {
+                const tr = document.createElement('tr');
+                const roleBadge = u.role === 'admin'
+                    ? '<span class="status-badge bg-red">管理员</span>'
+                    : '<span class="status-badge bg-blue">普通用户</span>';
+                const delBtn = u.role === 'admin'
+                    ? '<span class="muted">不可删除</span>'
+                    : `<button onclick="deleteAdminUser(${u.id}, '${escapeHtml(u.username)}')" class="btn-small">删除用户</button>`;
+
+                tr.innerHTML = `
+                    <td>#${u.id}</td>
+                    <td>${escapeHtml(u.username)}</td>
+                    <td>${roleBadge}</td>
+                    <td>${new Date(u.created_at).toLocaleDateString()}</td>
+                    <td>${u.total_items || 0} 件</td>
+                    <td>${formatCurrency(u.total_spent || 0)}</td>
+                    <td class="align-right">${delBtn}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        } catch (err) {
+            tbody.innerHTML = `<tr><td colspan="7" class="empty-state" style="color:#ef4444;">${escapeHtml(err.message)}</td></tr>`;
+        }
+    };
+
+    window.deleteAdminUser = function(id, username) {
+        showAppConfirm('删除用户？', `确定要删除用户「${username}」及其所有记录吗？此操作无法撤销。`, async () => {
+            try {
+                const res = await fetch(`/api/admin/user/${id}`, {
+                    method: 'DELETE',
+                    headers: getHeaders()
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error || '删除用户失败');
+
+                showAppAlert(data.message || '用户已删除', 'success');
+                loadAdminUsers();
+            } catch (err) {
+                showAppAlert(err.message || '删除用户失败');
+            }
+        }, '确认删除');
+    };
+
     // --- Mobile Swipe-to-Reveal Logic ---
     let touchStartX = 0;
     let swipeWrapper = null;
