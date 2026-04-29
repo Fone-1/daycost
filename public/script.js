@@ -351,6 +351,15 @@ document.addEventListener('DOMContentLoaded', () => {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ username, password })
             });
+
+            // 处理 Rate Limiting (429 状态码)
+            if (res.status === 429) {
+                const retryAfter = res.headers.get('Retry-After');
+                const seconds = retryAfter ? Math.ceil(parseInt(retryAfter)) : 900;
+                const minutes = Math.ceil(seconds / 60);
+                throw new Error(`请求过于频繁，请 ${minutes} 分钟后再试`);
+            }
+
             const data = await res.json();
             if (!res.ok) throw new Error(data.error || '登录失败');
 
@@ -371,6 +380,15 @@ document.addEventListener('DOMContentLoaded', () => {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ username, password })
             });
+
+            // 处理 Rate Limiting (429 状态码)
+            if (res.status === 429) {
+                const retryAfter = res.headers.get('Retry-After');
+                const seconds = retryAfter ? Math.ceil(parseInt(retryAfter)) : 900;
+                const minutes = Math.ceil(seconds / 60);
+                throw new Error(`请求过于频繁，请 ${minutes} 分钟后再试`);
+            }
+
             const data = await res.json();
             if (!res.ok) throw new Error(data.error || '注册失败');
 
@@ -383,6 +401,33 @@ document.addEventListener('DOMContentLoaded', () => {
     function showAuthError(msg) {
         authError.textContent = msg;
         authError.classList.remove('hidden');
+
+        // 如果是 Rate Limiting 错误，添加倒计时
+        if (msg.includes('请求过于频繁')) {
+            const match = msg.match(/(\d+)\s*分钟/);
+            if (match) {
+                let remainingSeconds = parseInt(match[1]) * 60;
+                authSubmitBtn.disabled = true;
+                authSubmitBtn.style.opacity = '0.5';
+                authSubmitBtn.style.cursor = 'not-allowed';
+
+                const countdown = setInterval(() => {
+                    remainingSeconds--;
+                    if (remainingSeconds <= 0) {
+                        clearInterval(countdown);
+                        authSubmitBtn.disabled = false;
+                        authSubmitBtn.style.opacity = '1';
+                        authSubmitBtn.style.cursor = 'pointer';
+                        authError.classList.add('hidden');
+                        authError.textContent = '';
+                    } else {
+                        const mins = Math.floor(remainingSeconds / 60);
+                        const secs = remainingSeconds % 60;
+                        authError.textContent = `请求过于频繁，请 ${mins > 0 ? mins + '分' : ''}${secs}秒 后再试`;
+                    }
+                }, 1000);
+            }
+        }
     }
 
     // --- Change Password Logic ---
@@ -1677,13 +1722,14 @@ document.addEventListener('DOMContentLoaded', () => {
                     ? '<span style="background: rgba(239, 68, 68, 0.2); color: #ef4444; padding: 2px 8px; border-radius: 12px; font-size: 0.8rem;">管理员</span>'
                     : '<span style="background: rgba(59, 130, 246, 0.2); color: #3b82f6; padding: 2px 8px; border-radius: 12px; font-size: 0.8rem;">普通用户</span>';
                 
-                const delBtn = u.role === 'admin' 
+                const safeUsername = escapeHtml(u.username);
+                const delBtn = u.role === 'admin'
                     ? '<span style="color: #64748b; font-size: 0.8rem;">不可处决</span>'
-                    : `<button onclick="deleteAdminUser(${u.id}, '${u.username}')" style="background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.5); color: #fca5a5; padding: 4px 10px; border-radius: 6px; cursor: pointer; transition: 0.2s;">处决</button>`;
+                    : `<button onclick="deleteAdminUser(${u.id}, '${safeUsername}')" style="background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.5); color: #fca5a5; padding: 4px 10px; border-radius: 6px; cursor: pointer; transition: 0.2s;">处决</button>`;
 
                 tr.innerHTML = `
                     <td style="padding: 12px 10px; color: #94a3b8;">#${u.id}</td>
-                    <td style="padding: 12px 10px; font-weight: 600;">${u.username}</td>
+                    <td style="padding: 12px 10px; font-weight: 600;">${safeUsername}</td>
                     <td style="padding: 12px 10px;">${roleBadge}</td>
                     <td style="padding: 12px 10px; color: #94a3b8;">${new Date(u.created_at).toLocaleDateString()}</td>
                     <td style="padding: 12px 10px; color: #f8fafc;">${u.total_items} 件</td>
@@ -1693,7 +1739,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 tbody.appendChild(tr);
             });
         } catch (e) {
-            tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; color: #ef4444; padding: 20px;">${e.message}</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; color: #ef4444; padding: 20px;">${escapeHtml(e.message)}</td></tr>`;
         }
     };
     

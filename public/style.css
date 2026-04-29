@@ -434,6 +434,23 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
     font-size: 0.9rem;
     text-align: center;
     border: 1px solid rgba(239, 68, 68, 0.3);
+    transition: all 0.3s ease;
+}
+
+.error-msg:not(.hidden) {
+    animation: shake 0.3s ease-in-out;
+}
+
+@keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    25% { transform: translateX(-5px); }
+    75% { transform: translateX(5px); }
+}
+
+.btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    pointer-events: none;
 }
 
 /* Result Container */
