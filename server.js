@@ -2,6 +2,7 @@ const express = require('express');
 const sqlite3 = require('sqlite3').verbose();
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcrypt');
+const crypto = require('crypto');
 const cors = require('cors');
 const path = require('path');
 const rateLimit = require('express-rate-limit');
@@ -1220,11 +1221,6 @@ app.delete('/api/admin/user/:id', authenticateToken, requireAdmin, (req, res) =>
     });
 });
 
-// Catch-all route for sending index.html
-app.use((req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'index.html'));
-});
-
 // --- TOTP API ---
 const TOTP_ENCRYPTION_KEY = process.env.TOTP_KEY || JWT_SECRET.padEnd(32, '0').slice(0, 32);
 
@@ -1319,6 +1315,11 @@ app.delete('/api/totp/:id', authenticateToken, (req, res) => {
         if (err) return res.status(500).json({ error: '删除失败' });
         res.json({ success: true });
     });
+});
+
+// Catch-all route for sending index.html
+app.use((req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
 // Start Server
