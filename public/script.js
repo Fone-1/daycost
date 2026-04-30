@@ -1046,19 +1046,44 @@ document.addEventListener('DOMContentLoaded', () => {
         renderHistory();
     }
 
-    // Event delegation for toggle-children-btn (Clusterize replaces DOM via innerHTML,
-    // so inline onclick handlers may not bind reliably)
+    // Event delegation for buttons inside Clusterize virtual scroll
+    // (Clusterize replaces DOM via innerHTML, so inline onclick handlers may not bind reliably)
     const historyScrollEl = document.getElementById('historyListScroll');
     if (historyScrollEl) {
         historyScrollEl.addEventListener('click', (e) => {
-            const btn = e.target.closest('.toggle-children-btn');
-            if (btn) {
+            const toggleBtn = e.target.closest('.toggle-children-btn');
+            if (toggleBtn) {
                 e.stopPropagation();
-                const parentId = parseInt(btn.dataset.parentId, 10);
-                if (!isNaN(parentId)) {
-                    toggleChildren(parentId);
-                }
+                const parentId = parseInt(toggleBtn.dataset.parentId, 10);
+                if (!isNaN(parentId)) toggleChildren(parentId);
+                return;
             }
+            const actionBtn = e.target.closest('[data-action]');
+            if (actionBtn) {
+                e.stopPropagation();
+                const recordId = parseInt(actionBtn.dataset.recordId, 10);
+                const action = actionBtn.dataset.action;
+                if (isNaN(recordId)) return;
+                if (action === 'edit') openStatusModal(recordId);
+                else if (action === 'delete') deleteRecord(recordId);
+                else if (action === 'restore') restoreRecord(recordId);
+                else if (action === 'purge') purgeRecord(recordId);
+            }
+        });
+    }
+
+    // Event delegation for trash list buttons
+    const trashScrollEl = document.getElementById('trashListScroll');
+    if (trashScrollEl) {
+        trashScrollEl.addEventListener('click', (e) => {
+            const actionBtn = e.target.closest('[data-action]');
+            if (!actionBtn) return;
+            e.stopPropagation();
+            const recordId = parseInt(actionBtn.dataset.recordId, 10);
+            const action = actionBtn.dataset.action;
+            if (isNaN(recordId)) return;
+            if (action === 'restore') restoreRecord(recordId);
+            else if (action === 'purge') purgeRecord(recordId);
         });
     }
 
@@ -1112,8 +1137,8 @@ document.addEventListener('DOMContentLoaded', () => {
                         </div>
                     </div>
                     <div class="swipe-actions">
-                        <button class="status-btn" onclick="openStatusModal(${record.id})" title="修改">⚙️</button>
-                        ${isChild ? '' : `<button class="delete-btn" onclick="deleteRecord(${record.id})" title="删除">🗑️</button>`}
+                        <button class="status-btn" data-action="edit" data-record-id="${record.id}" title="修改">⚙️</button>
+                        ${isChild ? '' : `<button class="delete-btn" data-action="delete" data-record-id="${record.id}" title="删除">🗑️</button>`}
                     </div>
                 </div>
             </div>
@@ -1186,8 +1211,8 @@ document.addEventListener('DOMContentLoaded', () => {
                         </div>
                     </div>
                     <div class="swipe-actions">
-                        <button class="status-btn" onclick="openStatusModal(${record.id})" title="编辑">编辑</button>
-                        ${isChild ? '' : `<button class="delete-btn" onclick="deleteRecord(${record.id})" title="删除">删除</button>`}
+                        <button class="status-btn" data-action="edit" data-record-id="${record.id}" title="编辑">编辑</button>
+                        ${isChild ? '' : `<button class="delete-btn" data-action="delete" data-record-id="${record.id}" title="删除">删除</button>`}
                     </div>
                 </div>
             </div>
@@ -1650,8 +1675,8 @@ document.addEventListener('DOMContentLoaded', () => {
                             <span class="history-meta" style="color: #64748b;">买入 ¥${record.price.toFixed(2)} · 删于 ${record.deleted_at ? record.deleted_at.split(' ')[0] : '未知'}</span>
                         </div>
                         <div class="history-actions" style="display: flex; gap: 8px;">
-                            <button class="status-btn" onclick="restoreRecord(${record.id})" title="还原记录" style="background: rgba(16, 185, 129, 0.15); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.2); padding: 5px 12px; border-radius: 10px;">↩️</button>
-                            <button class="delete-btn" onclick="purgeRecord(${record.id})" title="粉碎销毁" style="background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.2); color: #ef4444; padding: 5px 12px; border-radius: 10px;">🔥</button>
+                            <button class="status-btn" data-action="restore" data-record-id="${record.id}" title="还原记录" style="background: rgba(16, 185, 129, 0.15); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.2); padding: 5px 12px; border-radius: 10px;">↩️</button>
+                            <button class="delete-btn" data-action="purge" data-record-id="${record.id}" title="粉碎销毁" style="background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.2); color: #ef4444; padding: 5px 12px; border-radius: 10px;">🔥</button>
                         </div>
                     </div>
                 </div>
@@ -2200,8 +2225,8 @@ document.addEventListener('DOMContentLoaded', () => {
                             <span class="history-meta">买入 ${formatCurrency(record.price)} · 删除于 ${record.deleted_at ? record.deleted_at.split(' ')[0] : '未知'}</span>
                         </div>
                         <div class="history-actions" style="display:flex; gap:8px;">
-                            <button class="status-btn" onclick="restoreRecord(${record.id})" title="恢复记录">恢复</button>
-                            <button class="delete-btn" onclick="purgeRecord(${record.id})" title="永久删除">删除</button>
+                            <button class="status-btn" data-action="restore" data-record-id="${record.id}" title="恢复记录">恢复</button>
+                            <button class="delete-btn" data-action="purge" data-record-id="${record.id}" title="永久删除">删除</button>
                         </div>
                     </div>
                 </div>
