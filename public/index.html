@@ -219,7 +219,7 @@
             <section class="card glass">
                 <h3 class="section-title-row">
                     注册用户
-                    <button class="btn-small" onclick="loadAdminUsers()">刷新</button>
+                    <button class="btn-small" id="adminRefreshBtn">刷新</button>
                 </h3>
                 <div class="table-scroll">
                     <table class="admin-table">
@@ -295,7 +295,7 @@
                 </section>
 
                 <section class="form-section">
-                    <h3>折旧设置 <button type="button" class="inline-info-btn" onclick="openDepreciationInfoModal()">说明</button></h3>
+                    <h3>折旧设置 <button type="button" class="inline-info-btn" id="depreciationInfoBtn1">说明</button></h3>
                     <div class="form-group">
                         <label for="statusEditDepreciationMethod">折旧算法</label>
                         <select id="statusEditDepreciationMethod" class="sort-select">
@@ -451,7 +451,7 @@
                 </section>
 
                 <section class="form-section">
-                    <h3>折旧设置 <button type="button" class="inline-info-btn" onclick="openDepreciationInfoModal()">说明</button></h3>
+                    <h3>折旧设置 <button type="button" class="inline-info-btn" id="depreciationInfoBtn2">说明</button></h3>
                     <div class="form-group">
                         <label for="formDepreciationMethod">折旧算法</label>
                         <select id="formDepreciationMethod" class="sort-select">

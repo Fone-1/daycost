@@ -1058,6 +1058,16 @@ document.addEventListener('DOMContentLoaded', () => {
     if (depreciationInfoModalClose && depreciationInfoModal) depreciationInfoModalClose.addEventListener('click', () => depreciationInfoModal.classList.add('hidden'));
     if (depreciationInfoOkBtn && depreciationInfoModal) depreciationInfoOkBtn.addEventListener('click', () => depreciationInfoModal.classList.add('hidden'));
 
+    // Depreciation info buttons (two instances: one in status modal, one in add form)
+    const depInfoBtn1 = document.getElementById('depreciationInfoBtn1');
+    const depInfoBtn2 = document.getElementById('depreciationInfoBtn2');
+    if (depInfoBtn1 && depreciationInfoModal) depInfoBtn1.addEventListener('click', () => depreciationInfoModal.classList.remove('hidden'));
+    if (depInfoBtn2 && depreciationInfoModal) depInfoBtn2.addEventListener('click', () => depreciationInfoModal.classList.remove('hidden'));
+
+    // Admin refresh button
+    const adminRefreshBtn = document.getElementById('adminRefreshBtn');
+    if (adminRefreshBtn) adminRefreshBtn.addEventListener('click', () => { if (typeof loadAdminUsers === 'function') loadAdminUsers(); });
+
     // Event delegation for buttons inside Clusterize virtual scroll
     // (Clusterize replaces DOM via innerHTML, so inline onclick handlers may not bind reliably)
     const historyScrollEl = document.getElementById('historyListScroll');
