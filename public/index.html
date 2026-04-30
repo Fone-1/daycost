@@ -60,7 +60,7 @@
 
         <div id="pane-home" class="spa-pane active">
             <main class="pane-main">
-                <button id="fabAddBtn" class="fab-btn" title="添加记录" onclick="document.getElementById('addItemModal').classList.remove('hidden')">+</button>
+                <button id="fabAddBtn" class="fab-btn" title="添加记录">+</button>
 
                 <section class="history-section glass">
                     <div class="history-header">
@@ -419,7 +419,7 @@
 
     <div id="addItemModal" class="modal-overlay hidden">
         <div class="modal-content glass form-modal">
-            <button class="modal-close" onclick="document.getElementById('addItemModal').classList.add('hidden')">&times;</button>
+            <button class="modal-close" id="addItemModalClose">&times;</button>
             <h2>添加物品</h2>
             <form id="costForm" class="structured-form">
                 <section class="form-section">
@@ -500,7 +500,7 @@
 
     <div id="depreciationInfoModal" class="modal-overlay hidden">
         <div class="modal-content glass info-modal">
-            <button class="modal-close" onclick="document.getElementById('depreciationInfoModal').classList.add('hidden')">&times;</button>
+            <button class="modal-close" id="depreciationInfoModalClose">&times;</button>
             <h2>折旧算法说明</h2>
             <section class="info-section">
                 <h3>直线折旧法</h3>
@@ -510,7 +510,7 @@
                 <h3>双倍余额递减法</h3>
                 <p>适合手机、显卡等前期贬值较快的物品。系统按日递减估算当前价值，并不会低于预计残值。</p>
             </section>
-            <button type="button" class="btn" onclick="document.getElementById('depreciationInfoModal').classList.add('hidden')">知道了</button>
+            <button type="button" class="btn" id="depreciationInfoOkBtn">知道了</button>
         </div>
     </div>
 

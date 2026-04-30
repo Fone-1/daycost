@@ -1046,6 +1046,18 @@ document.addEventListener('DOMContentLoaded', () => {
         renderHistory();
     }
 
+    // Modal open/close bindings (moved from inline onclick in HTML)
+    const fabAddBtn = document.getElementById('fabAddBtn');
+    const addItemModal = document.getElementById('addItemModal');
+    const addItemModalClose = document.getElementById('addItemModalClose');
+    const depreciationInfoModal = document.getElementById('depreciationInfoModal');
+    const depreciationInfoModalClose = document.getElementById('depreciationInfoModalClose');
+    const depreciationInfoOkBtn = document.getElementById('depreciationInfoOkBtn');
+    if (fabAddBtn && addItemModal) fabAddBtn.addEventListener('click', () => addItemModal.classList.remove('hidden'));
+    if (addItemModalClose && addItemModal) addItemModalClose.addEventListener('click', () => addItemModal.classList.add('hidden'));
+    if (depreciationInfoModalClose && depreciationInfoModal) depreciationInfoModalClose.addEventListener('click', () => depreciationInfoModal.classList.add('hidden'));
+    if (depreciationInfoOkBtn && depreciationInfoModal) depreciationInfoOkBtn.addEventListener('click', () => depreciationInfoModal.classList.add('hidden'));
+
     // Event delegation for buttons inside Clusterize virtual scroll
     // (Clusterize replaces DOM via innerHTML, so inline onclick handlers may not bind reliably)
     const historyScrollEl = document.getElementById('historyListScroll');
