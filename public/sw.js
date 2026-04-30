@@ -1,9 +1,10 @@
-const CACHE_NAME = 'daycost-v24';
+const CACHE_NAME = 'daycost-v25';
 const ASSETS_TO_CACHE = [
     '/',
     '/index.html',
     '/style.css',
     '/script.js',
+    '/chart.min.js',
     '/clusterize.min.css',
     '/clusterize.min.js',
     '/icon-512.png',
