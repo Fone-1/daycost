@@ -1046,6 +1046,22 @@ document.addEventListener('DOMContentLoaded', () => {
         renderHistory();
     }
 
+    // Event delegation for toggle-children-btn (Clusterize replaces DOM via innerHTML,
+    // so inline onclick handlers may not bind reliably)
+    const historyScrollEl = document.getElementById('historyListScroll');
+    if (historyScrollEl) {
+        historyScrollEl.addEventListener('click', (e) => {
+            const btn = e.target.closest('.toggle-children-btn');
+            if (btn) {
+                e.stopPropagation();
+                const parentId = parseInt(btn.dataset.parentId, 10);
+                if (!isNaN(parentId)) {
+                    toggleChildren(parentId);
+                }
+            }
+        });
+    }
+
     // Helper to generate a single historic item HTML
     function createItemHtml(record, isChild = false) {
         const status = record.status || 'active';
@@ -1219,7 +1235,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     const isExpanded = !!expandedParents[record.id];
                     const btnText = isExpanded ? `▲ 收起零件明细` : `▼ 展开零件明细 (${totalChildren}个部件)`;
 
-                    virtualRows.push(`<div class="record-wrapper"><button class="toggle-children-btn" style="width:100%; border-radius:10px; margin-top:5px; margin-bottom:5px;" onclick="toggleChildren(${record.id})">${btnText}</button></div>`);
+                    virtualRows.push(`<div class="record-wrapper"><button class="toggle-children-btn" data-parent-id="${record.id}" style="width:100%; border-radius:10px; margin-top:5px; margin-bottom:5px;">${btnText}</button></div>`);
 
                     if (isExpanded) {
                         children.forEach(child => {

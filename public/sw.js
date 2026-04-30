@@ -1,4 +1,4 @@
-const CACHE_NAME = 'daycost-v19';
+const CACHE_NAME = 'daycost-v20';
 const ASSETS_TO_CACHE = [
     '/',
     '/index.html',
