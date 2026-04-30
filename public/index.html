@@ -52,6 +52,7 @@
                 <button class="nav-btn active" data-target="pane-home">账本</button>
                 <button class="nav-btn" data-target="pane-stats">统计</button>
                 <button class="nav-btn" data-target="pane-trash">回收站</button>
+                <button class="nav-btn" data-target="pane-totp">密钥</button>
                 <button class="nav-btn" data-target="pane-settings">设置</button>
                 <button class="nav-btn hidden admin-nav-btn" id="navAdminBtn" data-target="pane-admin">审计</button>
             </div>
@@ -169,6 +170,38 @@
                     </div>
                 </div>
             </div>
+        </div>
+
+        <!-- TOTP Pane -->
+        <div id="pane-totp" class="spa-pane hidden">
+            <header>
+                <h2>密钥管理</h2>
+            </header>
+            <main class="pane-main">
+                <section class="card glass">
+                    <h3>添加密钥</h3>
+                    <form id="totpAddForm" class="structured-form">
+                        <div class="form-group">
+                            <label for="totpLabel">名称</label>
+                            <input type="text" id="totpLabel" placeholder="例如: GitHub" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="totpIssuer">发行方 (可选)</label>
+                            <input type="text" id="totpIssuer" placeholder="例如: GitHub Inc">
+                        </div>
+                        <div class="form-group">
+                            <label for="totpSecret">密钥 (Base32)</label>
+                            <input type="text" id="totpSecret" placeholder="JBSWY3DPEHPK3PXP" required autocomplete="off">
+                        </div>
+                        <button type="submit" class="btn">添加</button>
+                    </form>
+                </section>
+                <section class="card glass">
+                    <h3>验证码</h3>
+                    <div id="totpCodesContainer" class="totp-grid"></div>
+                    <div id="totpEmptyState" class="empty-state" style="display:none;">还没有密钥，添加一个试试吧。</div>
+                </section>
+            </main>
         </div>
 
         <div id="pane-settings" class="spa-pane hidden">

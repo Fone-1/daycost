@@ -116,6 +116,20 @@ const db = new sqlite3.Database(DB_PATH, (err) => {
             // --- PERFORMANCE: Create Indexes ---
             db.run("CREATE INDEX IF NOT EXISTS idx_records_user_list ON records(user_id, is_deleted, created_at)");
             db.run("CREATE INDEX IF NOT EXISTS idx_records_parent ON records(parent_id)");
+
+            // TOTP entries table
+            db.run(`CREATE TABLE IF NOT EXISTS totp_entries (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                label TEXT NOT NULL,
+                secret_enc TEXT NOT NULL,
+                iv TEXT NOT NULL,
+                auth_tag TEXT NOT NULL,
+                issuer TEXT DEFAULT '',
+                digits INTEGER DEFAULT 30,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES users(id)
+            )`);
         });
     }
 });
@@ -1209,6 +1223,102 @@ app.delete('/api/admin/user/:id', authenticateToken, requireAdmin, (req, res) =>
 // Catch-all route for sending index.html
 app.use((req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
+// --- TOTP API ---
+const TOTP_ENCRYPTION_KEY = process.env.TOTP_KEY || JWT_SECRET.padEnd(32, '0').slice(0, 32);
+
+function encryptSecret(plainText) {
+    const iv = crypto.randomBytes(12);
+    const cipher = crypto.createCipheriv('aes-256-gcm', Buffer.from(TOTP_ENCRYPTION_KEY, 'utf8'), iv);
+    let enc = cipher.update(plainText, 'utf8', 'hex');
+    enc += cipher.final('hex');
+    return { enc, iv: iv.toString('hex'), authTag: cipher.getAuthTag().toString('hex') };
+}
+
+function decryptSecret(enc, ivHex, tagHex) {
+    const decipher = crypto.createDecipheriv('aes-256-gcm', Buffer.from(TOTP_ENCRYPTION_KEY, 'utf8'), Buffer.from(ivHex, 'hex'));
+    decipher.setAuthTag(Buffer.from(tagHex, 'hex'));
+    let dec = decipher.update(enc, 'hex', 'utf8');
+    dec += decipher.final('utf8');
+    return dec;
+}
+
+function base32Decode(str) {
+    const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
+    str = str.replace(/=+$/, '').toUpperCase();
+    let bits = '';
+    for (const c of str) {
+        const val = alphabet.indexOf(c);
+        if (val === -1) continue;
+        bits += val.toString(2).padStart(5, '0');
+    }
+    const bytes = [];
+    for (let i = 0; i + 8 <= bits.length; i += 8) {
+        bytes.push(parseInt(bits.substring(i, i + 8), 2));
+    }
+    return Buffer.from(bytes);
+}
+
+function generateTOTP(secretBase32, period = 30, digits = 6) {
+    const key = base32Decode(secretBase32);
+    const epoch = Math.floor(Date.now() / 1000);
+    const counter = Math.floor(epoch / period);
+    const counterBuf = Buffer.alloc(8);
+    counterBuf.writeUInt32BE(Math.floor(counter / 0x100000000), 0);
+    counterBuf.writeUInt32BE(counter & 0xFFFFFFFF, 4);
+    const hmac = crypto.createHmac('sha1', key).update(counterBuf).digest();
+    const offset = hmac[hmac.length - 1] & 0x0f;
+    const code = ((hmac[offset] & 0x7f) << 24 | hmac[offset + 1] << 16 | hmac[offset + 2] << 8 | hmac[offset + 3]) % Math.pow(10, digits);
+    return { code: String(code).padStart(digits, '0'), remaining: period - (epoch % period) };
+}
+
+// GET /api/totp - list entries (no secrets)
+app.get('/api/totp', authenticateToken, (req, res) => {
+    db.all('SELECT id, label, issuer, digits, created_at FROM totp_entries WHERE user_id = ? ORDER BY created_at DESC', [req.user.id], (err, rows) => {
+        if (err) return res.status(500).json({ error: '查询失败' });
+        res.json(rows);
+    });
+});
+
+// GET /api/totp/codes - generate current codes for all entries
+app.get('/api/totp/codes', authenticateToken, (req, res) => {
+    db.all('SELECT id, label, issuer, secret_enc, iv, auth_tag, digits FROM totp_entries WHERE user_id = ?', [req.user.id], (err, rows) => {
+        if (err) return res.status(500).json({ error: '查询失败' });
+        const codes = rows.map(r => {
+            try {
+                const secret = decryptSecret(r.secret_enc, r.iv, r.auth_tag);
+                const { code, remaining } = generateTOTP(secret, r.digits || 30);
+                return { id: r.id, label: r.label, issuer: r.issuer, code, remaining, period: r.digits || 30 };
+            } catch (e) {
+                return { id: r.id, label: r.label, issuer: r.issuer, code: 'ERROR', remaining: 0, period: 30 };
+            }
+        });
+        res.json(codes);
+    });
+});
+
+// POST /api/totp - add entry
+app.post('/api/totp', authenticateToken, (req, res) => {
+    const { label, secret, issuer } = req.body;
+    if (!label || !secret) return res.status(400).json({ error: '名称和密钥必填' });
+    const cleanSecret = secret.replace(/\s/g, '').toUpperCase();
+    const { enc, iv, authTag } = encryptSecret(cleanSecret);
+    db.run('INSERT INTO totp_entries (user_id, label, secret_enc, iv, auth_tag, issuer) VALUES (?, ?, ?, ?, ?, ?)',
+        [req.user.id, label, enc, iv, authTag, issuer || ''],
+        function (err) {
+            if (err) return res.status(500).json({ error: '添加失败' });
+            res.json({ id: this.lastID, label, issuer: issuer || '' });
+        }
+    );
+});
+
+// DELETE /api/totp/:id
+app.delete('/api/totp/:id', authenticateToken, (req, res) => {
+    db.run('DELETE FROM totp_entries WHERE id = ? AND user_id = ?', [req.params.id, req.user.id], function (err) {
+        if (err) return res.status(500).json({ error: '删除失败' });
+        res.json({ success: true });
+    });
 });
 
 // Start Server

@@ -2425,7 +2425,122 @@ document.addEventListener('DOMContentLoaded', () => {
             if (btn.getAttribute('data-target') === 'pane-admin') {
                 loadAdminUsers();
             }
+            // Load TOTP codes when switching to TOTP tab
+            if (btn.getAttribute('data-target') === 'pane-totp') {
+                loadTOTPCodes();
+            }
         });
     });
+
+    // --- TOTP ---
+    let totpRefreshInterval = null;
+
+    async function loadTOTPCodes() {
+        try {
+            const res = await fetch('/api/totp/codes', { headers: getHeaders() });
+            if (!res.ok) return;
+            const codes = await res.json();
+            renderTOTPCards(codes);
+            // Start auto-refresh
+            clearInterval(totpRefreshInterval);
+            totpRefreshInterval = setInterval(loadTOTPCodes, 1000);
+        } catch (e) {
+            console.error('TOTP load failed', e);
+        }
+    }
+
+    function renderTOTPCards(codes) {
+        const container = document.getElementById('totpCodesContainer');
+        const emptyState = document.getElementById('totpEmptyState');
+        if (!container) return;
+
+        if (codes.length === 0) {
+            container.innerHTML = '';
+            if (emptyState) emptyState.style.display = 'block';
+            return;
+        }
+        if (emptyState) emptyState.style.display = 'none';
+
+        container.innerHTML = codes.map(c => {
+            const pct = (c.remaining / c.period) * 100;
+            let colorClass = 'green';
+            if (c.remaining <= 5) colorClass = 'red';
+            else if (c.remaining <= 10) colorClass = 'yellow';
+            return `
+                <div class="totp-card">
+                    <div class="totp-card-header">
+                        <div>
+                            <div class="totp-label">${escapeHtml(c.label)}</div>
+                            ${c.issuer ? `<div class="totp-issuer">${escapeHtml(c.issuer)}</div>` : ''}
+                        </div>
+                        <button class="totp-delete-btn" data-totp-id="${c.id}" title="删除">🗑️</button>
+                    </div>
+                    <div class="totp-code" data-totp-code="${c.code}" title="点击复制">${c.code.slice(0,3)} ${c.code.slice(3)}</div>
+                    <div class="totp-progress-bar"><div class="totp-progress-fill ${colorClass}" style="width:${pct}%"></div></div>
+                    <div class="totp-remaining">${c.remaining}s 后刷新</div>
+                </div>
+            `;
+        }).join('');
+    }
+
+    // TOTP event delegation
+    const totpContainer = document.getElementById('totpCodesContainer');
+    if (totpContainer) {
+        totpContainer.addEventListener('click', async (e) => {
+            // Copy code
+            const codeEl = e.target.closest('.totp-code');
+            if (codeEl) {
+                const code = codeEl.dataset.totpCode;
+                try {
+                    await navigator.clipboard.writeText(code);
+                    codeEl.classList.add('copied');
+                    setTimeout(() => codeEl.classList.remove('copied'), 1000);
+                } catch (err) {
+                    // Fallback: select text
+                    const range = document.createRange();
+                    range.selectNodeContents(codeEl);
+                    window.getSelection().removeAllRanges();
+                    window.getSelection().addRange(range);
+                }
+                return;
+            }
+            // Delete entry
+            const delBtn = e.target.closest('.totp-delete-btn');
+            if (delBtn) {
+                const id = delBtn.dataset.totpId;
+                if (!confirm('确定删除这个密钥？')) return;
+                await fetch(`/api/totp/${id}`, { method: 'DELETE', headers: getHeaders() });
+                loadTOTPCodes();
+            }
+        });
+    }
+
+    // TOTP add form
+    const totpAddForm = document.getElementById('totpAddForm');
+    if (totpAddForm) {
+        totpAddForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const label = document.getElementById('totpLabel').value.trim();
+            const secret = document.getElementById('totpSecret').value.trim();
+            const issuer = document.getElementById('totpIssuer').value.trim();
+            if (!label || !secret) return;
+            try {
+                const res = await fetch('/api/totp', {
+                    method: 'POST',
+                    headers: { ...getHeaders(), 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ label, secret, issuer })
+                });
+                if (res.ok) {
+                    totpAddForm.reset();
+                    loadTOTPCodes();
+                } else {
+                    const data = await res.json();
+                    alert(data.error || '添加失败');
+                }
+            } catch (err) {
+                alert('网络错误');
+            }
+        });
+    }
 
 });
