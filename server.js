@@ -7,6 +7,8 @@ const cors = require('cors');
 const path = require('path');
 const rateLimit = require('express-rate-limit');
 const helmet = require('helmet');
+const https = require('https');
+const fs = require('fs');
 
 const app = express();
 app.set('trust proxy', 1); // 信任反向代理
@@ -1453,6 +1455,20 @@ app.use((req, res) => {
 });
 
 // Start Server
+const HTTPS_PORT = process.env.HTTPS_PORT || 3443;
+const certPath = path.join(__dirname, 'cert.pem');
+const keyPath = process.env.KEY_PATH || path.join(__dirname, 'key.pem');
+
+if (fs.existsSync(certPath) && fs.existsSync(keyPath)) {
+    const httpsOptions = {
+        cert: fs.readFileSync(certPath),
+        key: fs.readFileSync(keyPath)
+    };
+    https.createServer(httpsOptions, app).listen(HTTPS_PORT, () => {
+        console.log(`HTTPS server running on port ${HTTPS_PORT}`);
+    });
+}
+
 app.listen(PORT, () => {
-    console.log(`Server running on port ${PORT}`);
+    console.log(`HTTP server running on port ${PORT}`);
 });
