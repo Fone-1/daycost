@@ -2767,6 +2767,143 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    // TOTP QR Scan
+    const totpScanBtn = document.getElementById('totpScanBtn');
+    if (totpScanBtn) {
+        totpScanBtn.addEventListener('click', () => {
+            openScanModal();
+        });
+    }
+
+    let scanStream = null;
+    let scanAnimFrame = null;
+
+    function parseOtpauthUri(uri) {
+        // otpauth://totp/Label?secret=XXX&issuer=YYY&digits=6&period=30
+        try {
+            const url = new URL(uri);
+            if (url.protocol !== 'otpauth:') return null;
+            const params = url.searchParams;
+            let label = decodeURIComponent(url.pathname.replace(/^\//, ''));
+            // Label may contain issuer:account format
+            const issuer = params.get('issuer') || '';
+            if (label.includes(':')) {
+                const parts = label.split(':');
+                if (!issuer) label = parts[1].trim();
+                else label = label;
+            }
+            const secret = params.get('secret');
+            if (!secret) return null;
+            const digits = parseInt(params.get('digits')) || 6;
+            const period = parseInt(params.get('period')) || 30;
+            return { label: label || 'Unknown', secret: secret.replace(/\s/g, '').toUpperCase(), issuer, digits, period };
+        } catch (e) {
+            return null;
+        }
+    }
+
+    async function openScanModal() {
+        const modal = document.getElementById('totpScanModal');
+        const video = document.getElementById('totpScanVideo');
+        const canvas = document.getElementById('totpScanCanvas');
+        const ctx = canvas.getContext('2d', { willReadFrequently: true });
+        const resultDiv = document.getElementById('totpScanResult');
+        const resultText = document.getElementById('totpScanResultText');
+        const scanContinue = document.getElementById('totpScanContinue');
+        const scanDone = document.getElementById('totpScanDone');
+        const scanClose = document.getElementById('totpScanModalClose');
+
+        resultDiv.classList.add('hidden');
+        modal.classList.remove('hidden');
+
+        try {
+            scanStream = await navigator.mediaDevices.getUserMedia({
+                video: { facingMode: 'environment', width: { ideal: 640 }, height: { ideal: 480 } }
+            });
+            video.srcObject = scanStream;
+            await video.play();
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            scanLoop(video, canvas, ctx, resultDiv, resultText);
+        } catch (e) {
+            resultText.textContent = '无法访问摄像头：' + e.message;
+            resultDiv.classList.remove('hidden');
+        }
+
+        function cleanup() {
+            if (scanAnimFrame) { cancelAnimationFrame(scanAnimFrame); scanAnimFrame = null; }
+            if (scanStream) { scanStream.getTracks().forEach(t => t.stop()); scanStream = null; }
+            modal.classList.add('hidden');
+        }
+
+        scanClose.onclick = cleanup;
+        scanDone.onclick = cleanup;
+        scanContinue.onclick = () => {
+            resultDiv.classList.add('hidden');
+            scanLoop(video, canvas, ctx, resultDiv, resultText);
+        };
+    }
+
+    function scanLoop(video, canvas, ctx, resultDiv, resultText) {
+        if (!scanStream) return;
+        if (video.readyState === video.HAVE_ENOUGH_DATA) {
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            const code = jsQR(imageData.data, imageData.width, imageData.height, { inversionAttempts: 'dontInvert' });
+            if (code && code.data) {
+                handleScannedQR(code.data, resultDiv, resultText);
+                return;
+            }
+        }
+        scanAnimFrame = requestAnimationFrame(() => scanLoop(video, canvas, ctx, resultDiv, resultText));
+    }
+
+    async function handleScannedQR(data, resultDiv, resultText) {
+        // Play a short beep
+        try {
+            const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            const osc = audioCtx.createOscillator();
+            osc.type = 'sine';
+            osc.frequency.value = 1200;
+            osc.connect(audioCtx.destination);
+            osc.start();
+            osc.stop(audioCtx.currentTime + 0.1);
+        } catch (e) {}
+
+        const parsed = parseOtpauthUri(data);
+        if (!parsed) {
+            resultText.textContent = '无法识别的二维码（需要 otpauth:// 格式）';
+            resultDiv.classList.remove('hidden');
+            return;
+        }
+
+        try {
+            const res = await fetch('/api/totp', {
+                method: 'POST',
+                headers: { ...getHeaders(), 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    label: parsed.label,
+                    secret: parsed.secret,
+                    issuer: parsed.issuer,
+                    group: totpCurrentGroup || '默认分组'
+                })
+            });
+            if (res.ok) {
+                resultText.textContent = `✅ 已添加：${parsed.label}${parsed.issuer ? ' (' + parsed.issuer + ')' : ''}`;
+                loadTOTPGroups();
+                loadTOTPCodes();
+            } else {
+                const err = await res.json();
+                resultText.textContent = '❌ 添加失败：' + (err.error || '未知错误');
+            }
+        } catch (e) {
+            resultText.textContent = '❌ 网络错误';
+        }
+        resultDiv.classList.remove('hidden');
+    }
+
     // TOTP Export
     const totpExportBtn = document.getElementById('totpExportBtn');
     if (totpExportBtn) {

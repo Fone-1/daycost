@@ -2150,3 +2150,47 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
         flex-wrap: wrap;
     }
 }
+
+/* TOTP QR Scan */
+.totp-scan-container {
+    position: relative;
+    width: 100%;
+    max-width: 400px;
+    margin: 0 auto;
+    border-radius: 12px;
+    overflow: hidden;
+    background: #000;
+}
+
+.totp-scan-container video {
+    width: 100%;
+    display: block;
+    border-radius: 12px;
+}
+
+.totp-scan-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+}
+
+.totp-scan-frame {
+    width: 200px;
+    height: 200px;
+    border: 2px solid rgba(96,165,250,0.8);
+    border-radius: 12px;
+    box-shadow: 0 0 0 9999px rgba(0,0,0,0.4);
+}
+
+.totp-scan-hint {
+    text-align: center;
+    color: #94a3b8;
+    font-size: 0.85rem;
+    margin: 10px 0 0;
+}
