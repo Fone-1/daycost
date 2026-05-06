@@ -12,7 +12,7 @@
     <meta name="apple-mobile-web-app-title" content="DayCost">
     <link rel="apple-touch-icon" href="/icon-512.png">
 
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="style.css?v=7">
     <link rel="stylesheet" href="/clusterize.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 </head>
@@ -154,11 +154,6 @@
                 </div>
 
                 <div class="card glass stats-chart-card trend-card">
-                    <div class="trend-controls">
-                        <button class="trend-btn" data-range="7d">7天</button>
-                        <button class="trend-btn active" data-range="30d">30天</button>
-                        <button class="trend-btn" data-range="1y">1年</button>
-                    </div>
                     <canvas id="trendChart"></canvas>
                     <h3 class="chart-caption">价值摊销趋势</h3>
                 </div>
@@ -175,39 +170,95 @@
         <!-- TOTP Pane -->
         <div id="pane-totp" class="spa-pane hidden">
             <header>
-                <h2>密钥管理</h2>
+                <div class="totp-header-actions">
+                    <button class="btn btn-sm" id="totpExportBtn" title="导出">📤 导出</button>
+                    <button class="btn btn-sm" id="totpImportBtn" title="导入">📥 导入</button>
+                    <input type="file" id="totpImportFile" accept=".json" style="display:none">
+                </div>
             </header>
             <main class="pane-main">
-                <section class="card glass">
-                    <h3>添加密钥</h3>
-                    <form id="totpAddForm" class="structured-form">
-                        <div class="form-group">
-                            <label for="totpLabel">名称</label>
-                            <input type="text" id="totpLabel" placeholder="例如: GitHub" required>
+                <!-- Group Sidebar + Content -->
+                <div class="totp-layout">
+                    <aside class="totp-sidebar glass">
+                        <div class="totp-sidebar-header">
+                            <span>分组</span>
+                            <button class="btn-icon" id="totpAddGroupBtn" title="新建分组">➕</button>
                         </div>
-                        <div class="form-group">
-                            <label for="totpIssuer">发行方 (可选)</label>
-                            <input type="text" id="totpIssuer" placeholder="例如: GitHub Inc">
-                        </div>
-                        <div class="form-group">
-                            <label for="totpSecret">密钥 (Base32)</label>
-                            <input type="text" id="totpSecret" placeholder="JBSWY3DPEHPK3PXP" required autocomplete="off">
-                        </div>
-                        <button type="submit" class="btn">添加</button>
-                    </form>
-                </section>
-                <section class="card glass">
-                    <h3>验证码</h3>
-                    <div id="totpCodesContainer" class="totp-grid"></div>
-                    <div id="totpEmptyState" class="empty-state" style="display:none;">还没有密钥，添加一个试试吧。</div>
-                </section>
+                        <div id="totpGroupList" class="totp-group-list"></div>
+                    </aside>
+                    <div class="totp-content">
+                        <section class="card glass">
+                            <h3>添加密钥</h3>
+                            <form id="totpAddForm" class="structured-form">
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label for="totpLabel">名称</label>
+                                        <input type="text" id="totpLabel" placeholder="例如: GitHub" required>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="totpIssuer">发行方 (可选)</label>
+                                        <input type="text" id="totpIssuer" placeholder="例如: GitHub Inc">
+                                    </div>
+                                </div>
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label for="totpSecret">密钥 (Base32)</label>
+                                        <input type="text" id="totpSecret" placeholder="JBSWY3DPEHPK3PXP" required autocomplete="off">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="totpGroupSelect">分组</label>
+                                        <select id="totpGroupSelect"></select>
+                                    </div>
+                                </div>
+                                <button type="submit" class="btn">添加</button>
+                            </form>
+                        </section>
+                        <section class="card glass">
+                            <h3 id="totpSectionTitle">验证码</h3>
+                            <div id="totpCodesContainer" class="totp-grid"></div>
+                            <div id="totpEmptyState" class="empty-state" style="display:none;">还没有密钥，添加一个试试吧。</div>
+                        </section>
+                    </div>
+                </div>
             </main>
         </div>
 
+        <!-- TOTP Import Preview Modal -->
+        <div id="totpImportModal" class="modal-overlay hidden">
+            <div class="modal-content glass small-modal">
+                <button class="modal-close" id="totpImportModalClose">&times;</button>
+                <h2>导入预览</h2>
+                <p id="totpImportSummary" class="modal-message"></p>
+                <div id="totpImportPreview" class="totp-import-preview"></div>
+                <div class="button-row">
+                    <button class="btn secondary-btn" id="totpImportCancel">取消</button>
+                    <button class="btn" id="totpImportConfirm">确认导入</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- TOTP Group Prompt Modal -->
+        <div id="totpGroupModal" class="modal-overlay hidden">
+            <div class="modal-content glass small-modal">
+                <button class="modal-close" id="totpGroupModalClose">&times;</button>
+                <h2 id="totpGroupModalTitle">新建分组</h2>
+                <div class="form-group" id="totpGroupModalInputWrap">
+                    <label for="totpGroupModalInput" id="totpGroupModalInputLabel">分组名称</label>
+                    <input type="text" id="totpGroupModalInput" placeholder="输入分组名称">
+                </div>
+                <div class="form-group" id="totpGroupModalSelectWrap" style="display:none;">
+                    <label for="totpGroupModalSelect">选择分组</label>
+                    <select id="totpGroupModalSelect" class="sort-select"></select>
+                </div>
+                <div id="totpGroupModalError" class="error-msg hidden"></div>
+                <div class="button-row">
+                    <button class="btn secondary-btn" id="totpGroupModalCancel">取消</button>
+                    <button class="btn" id="totpGroupModalConfirm">确认</button>
+                </div>
+            </div>
+        </div>
+
         <div id="pane-settings" class="spa-pane hidden">
-            <header>
-                <h2>设置与数据</h2>
-            </header>
             <div class="settings-grid">
                 <section class="card glass compact-card">
                     <h3>账号</h3>
@@ -553,6 +604,6 @@
 
     <script src="/clusterize.min.js"></script>
     <script src="/chart.min.js"></script>
-    <script src="script.js"></script>
+    <script src="script.js?v=7"></script>
 </body>
 </html>
