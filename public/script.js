@@ -2736,6 +2736,26 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    // TOTP add key modal
+    const totpAddKeyBtn = document.getElementById('totpAddKeyBtn');
+    const totpAddKeyModal = document.getElementById('totpAddKeyModal');
+    const totpAddKeyModalClose = document.getElementById('totpAddKeyModalClose');
+    const totpAddKeyCancel = document.getElementById('totpAddKeyCancel');
+
+    function openAddKeyModal() {
+        if (totpAddKeyModal) totpAddKeyModal.classList.remove('hidden');
+    }
+    function closeAddKeyModal() {
+        if (totpAddKeyModal) totpAddKeyModal.classList.add('hidden');
+    }
+
+    if (totpAddKeyBtn) totpAddKeyBtn.addEventListener('click', openAddKeyModal);
+    if (totpAddKeyModalClose) totpAddKeyModalClose.addEventListener('click', closeAddKeyModal);
+    if (totpAddKeyCancel) totpAddKeyCancel.addEventListener('click', closeAddKeyModal);
+    if (totpAddKeyModal) totpAddKeyModal.addEventListener('click', (e) => {
+        if (e.target === totpAddKeyModal) closeAddKeyModal();
+    });
+
     // TOTP add form
     const totpAddForm = document.getElementById('totpAddForm');
     if (totpAddForm) {
@@ -2755,6 +2775,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 });
                 if (res.ok) {
                     totpAddForm.reset();
+                    closeAddKeyModal();
                     loadTOTPGroups();
                     loadTOTPCodes();
                 } else {

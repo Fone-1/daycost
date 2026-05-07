@@ -189,33 +189,10 @@
                     </aside>
                     <div class="totp-content">
                         <section class="card glass">
-                            <h3>添加密钥</h3>
-                            <form id="totpAddForm" class="structured-form">
-                                <div class="form-row">
-                                    <div class="form-group">
-                                        <label for="totpLabel">名称</label>
-                                        <input type="text" id="totpLabel" placeholder="例如: GitHub" required>
-                                    </div>
-                                    <div class="form-group">
-                                        <label for="totpIssuer">发行方 (可选)</label>
-                                        <input type="text" id="totpIssuer" placeholder="例如: GitHub Inc">
-                                    </div>
-                                </div>
-                                <div class="form-row">
-                                    <div class="form-group">
-                                        <label for="totpSecret">密钥 (Base32)</label>
-                                        <input type="text" id="totpSecret" placeholder="JBSWY3DPEHPK3PXP" required autocomplete="off">
-                                    </div>
-                                    <div class="form-group">
-                                        <label for="totpGroupSelect">分组</label>
-                                        <select id="totpGroupSelect"></select>
-                                    </div>
-                                </div>
-                                <button type="submit" class="btn">添加</button>
-                            </form>
-                        </section>
-                        <section class="card glass">
                             <h3 id="totpSectionTitle">验证码</h3>
+                            <div class="totp-toolbar">
+                                <button class="btn" id="totpAddKeyBtn">+ 添加密钥</button>
+                            </div>
                             <div id="totpCodesContainer" class="totp-grid"></div>
                             <div id="totpEmptyState" class="empty-state" style="display:none;">还没有密钥，添加一个试试吧。</div>
                         </section>
@@ -224,7 +201,41 @@
             </main>
         </div>
 
-        <!-- TOTP Import Preview Modal -->
+        <!-- TOTP Add Key Modal -->
+        <div id="totpAddKeyModal" class="modal-overlay hidden">
+            <div class="modal-content glass">
+                <button class="modal-close" id="totpAddKeyModalClose">&times;</button>
+                <h2>添加密钥</h2>
+                <form id="totpAddForm" class="structured-form">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="totpLabel">名称</label>
+                            <input type="text" id="totpLabel" placeholder="例如: GitHub" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="totpIssuer">发行方 (可选)</label>
+                            <input type="text" id="totpIssuer" placeholder="例如: GitHub Inc">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="totpSecret">密钥 (Base32)</label>
+                            <input type="text" id="totpSecret" placeholder="JBSWY3DPEHPK3PXP" required autocomplete="off">
+                        </div>
+                        <div class="form-group">
+                            <label for="totpGroupSelect">分组</label>
+                            <select id="totpGroupSelect"></select>
+                        </div>
+                    </div>
+                    <div class="button-row">
+                        <button type="button" class="btn secondary-btn" id="totpAddKeyCancel">取消</button>
+                        <button type="submit" class="btn">添加</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+<!-- TOTP Import Preview Modal -->
         <div id="totpImportModal" class="modal-overlay hidden">
             <div class="modal-content glass small-modal">
                 <button class="modal-close" id="totpImportModalClose">&times;</button>
