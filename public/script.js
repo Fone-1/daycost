@@ -3080,3 +3080,55 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
 });
+
+// --- Theme Management ---
+document.addEventListener('DOMContentLoaded', () => {
+    const themeSelect = document.getElementById('themeSelect');
+    if (!themeSelect) return;
+
+    const savedTheme = localStorage.getItem('daycost_theme') || 'system';
+    themeSelect.value = savedTheme;
+
+    function applyThemeToDOM(theme) {
+        const isSystemLight = window.matchMedia('(prefers-color-scheme: light)').matches;
+        if (theme === 'light' || (theme === 'system' && isSystemLight)) {
+            document.documentElement.setAttribute('data-theme', 'light');
+        } else {
+            document.documentElement.setAttribute('data-theme', 'dark');
+        }
+        
+        // Trigger a custom event in case charts or other components need to re-render
+        window.dispatchEvent(new Event('themechanged'));
+    }
+
+    themeSelect.addEventListener('change', (e) => {
+        const newTheme = e.target.value;
+        localStorage.setItem('daycost_theme', newTheme);
+        applyThemeToDOM(newTheme);
+    });
+
+    window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', () => {
+        if (themeSelect.value === 'system') {
+            applyThemeToDOM('system');
+        }
+    });
+});
+
+// --- Chart Theme Update Logic ---
+window.addEventListener('themechanged', () => {
+    if (typeof Chart !== 'undefined') {
+        const isLight = document.documentElement.getAttribute('data-theme') === 'light';
+        const textColor = isLight ? '#64748b' : '#cbd5e1';
+        const gridColor = isLight ? 'rgba(0,0,0,0.1)' : 'rgba(255,255,255,0.1)';
+        
+        Chart.defaults.color = textColor;
+        if (Chart.defaults.scale && Chart.defaults.scale.grid) {
+            Chart.defaults.scale.grid.color = gridColor;
+        }
+
+        // Re-render all existing charts
+        for (let id in Chart.instances) {
+            Chart.instances[id].update();
+        }
+    }
+});

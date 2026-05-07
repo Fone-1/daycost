@@ -15,6 +15,17 @@
     <link rel="stylesheet" href="style.css?v=8">
     <link rel="stylesheet" href="/clusterize.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <script>
+        (function() {
+            const savedTheme = localStorage.getItem('daycost_theme') || 'system';
+            const isSystemLight = window.matchMedia('(prefers-color-scheme: light)').matches;
+            if (savedTheme === 'light' || (savedTheme === 'system' && isSystemLight)) {
+                document.documentElement.setAttribute('data-theme', 'light');
+            } else {
+                document.documentElement.setAttribute('data-theme', 'dark');
+            }
+        })();
+    </script>
 </head>
 <body>
     <div class="container" id="authSection">
@@ -302,6 +313,20 @@
                         <div class="settings-actions">
                             <button id="changePwdBtn" class="btn secondary-btn">修改密码</button>
                             <button id="logoutBtn" class="btn danger-btn">退出登录</button>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="card glass compact-card">
+                    <h3>外观设置</h3>
+                    <div class="settings-row">
+                        <span>主题模式</span>
+                        <div class="settings-actions">
+                            <select id="themeSelect" class="sort-select">
+                                <option value="system">跟随系统</option>
+                                <option value="light">浅色模式</option>
+                                <option value="dark">深色模式</option>
+                            </select>
                         </div>
                     </div>
                 </section>
