@@ -4,6 +4,7 @@
   "description": "记录个人资产投入、使用状态和日均摊销成本。",
   "start_url": "/",
   "display": "standalone",
+  "permissions": ["camera"],
   "orientation": "portrait",
   "background_color": "#0f172a",
   "theme_color": "#0f172a",

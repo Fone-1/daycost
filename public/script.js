@@ -2817,6 +2817,10 @@ document.addEventListener('DOMContentLoaded', () => {
         modal.classList.remove('hidden');
 
         try {
+            // Check if getUserMedia is available
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                throw new Error('当前环境不支持摄像头（需要 HTTPS 访问）');
+            }
             scanStream = await navigator.mediaDevices.getUserMedia({
                 video: { facingMode: 'environment', width: { ideal: 640 }, height: { ideal: 480 } }
             });
@@ -2826,7 +2830,19 @@ document.addEventListener('DOMContentLoaded', () => {
             canvas.height = video.videoHeight;
             scanLoop(video, canvas, ctx, resultDiv, resultText);
         } catch (e) {
-            resultText.textContent = '无法访问摄像头：' + e.message;
+            let msg = '无法访问摄像头';
+            if (e.name === 'NotAllowedError' || e.message.includes('Permission denied')) {
+                msg = '摄像头权限被拒绝，请在浏览器设置中允许摄像头权限';
+            } else if (e.name === 'NotFoundError') {
+                msg = '未找到摄像头设备';
+            } else if (e.name === 'NotReadableError') {
+                msg = '摄像头被其他应用占用';
+            } else if (location.protocol !== 'https:' && location.hostname !== 'localhost') {
+                msg = '扫码需要 HTTPS 访问（当前为 HTTP）';
+            } else {
+                msg = '无法访问摄像头：' + e.message;
+            }
+            resultText.textContent = msg;
             resultDiv.classList.remove('hidden');
         }
 
