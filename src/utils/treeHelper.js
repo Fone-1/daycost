@@ -1,69 +1,18 @@
 // Centralized Tree-Aware Filtering Engine
 function getFilteredTreeRecords(userId, queryParams, db) {
     return new Promise((resolve, reject) => {
-        db.all(`SELECT * FROM records WHERE user_id = ? AND is_deleted = 0`, [userId], (err, rows) => {
+        db.all(`SELECT * FROM v_records_computed WHERE user_id = ? AND is_deleted = 0`, [userId], (err, rows) => {
             if (err) return reject(err);
 
             const { q, status, statsType, statsValue } = queryParams;
             const searchQuery = q ? q.toLowerCase() : null;
             const statusFilter = status && status !== 'all' ? status : null;
 
-            // 1. Calculate individual costs
-            const processedRecords = rows.map(record => {
-                const purchaseDate = new Date(record.purchase_date);
-                purchaseDate.setHours(0, 0, 0, 0);
-
-                let endDate = new Date();
-                const recordStatus = record.status || 'active';
-
-                if (recordStatus !== 'active' && record.end_date) {
-                    endDate = new Date(record.end_date);
-                }
-                endDate.setHours(0, 0, 0, 0);
-
-                const timeDiff = Math.max(0, endDate.getTime() - purchaseDate.getTime());
-                let daysUsed = Math.floor(timeDiff / (1000 * 3600 * 24));
-                const actualDaysForCalc = daysUsed + 1;
-
-                let finalCost = record.price;
-                if (recordStatus === 'sold') {
-                    finalCost = Math.max(0, record.price - (record.resale_price || 0));
-                }
-
-                let currentValue = record.price;
-                if (recordStatus === 'sold') {
-                    currentValue = record.resale_price || 0;
-                } else if (recordStatus === 'broken') {
-                    currentValue = 0;
-                } else {
-                    const depMethod = record.depreciation_method || 'straight_line';
-                    const lifespan = record.expected_lifespan || 1095;
-                    const salvage = record.expected_salvage || 0;
-
-                    if (depMethod === 'straight_line') {
-                        const dailyDep = (record.price - salvage) / lifespan;
-                        currentValue = Math.max(salvage, record.price - (dailyDep * actualDaysForCalc));
-                    } else if (depMethod === 'double_declining') {
-                        const dailyRate = 2 / lifespan;
-                        currentValue = record.price * Math.pow(1 - dailyRate, actualDaysForCalc);
-                        currentValue = Math.max(salvage, currentValue);
-                    }
-                }
-
-                return {
-                    ...record,
-                    _dailyCost: finalCost / actualDaysForCalc,
-                    _days: actualDaysForCalc,
-                    _finalCost: finalCost,
-                    _currentValue: currentValue
-                };
-            });
-
-            // 2. Build tree and aggregate
+            // 2. Build tree and aggregate (using SQL computed fields)
             const topLevelMap = {};
             const childrenMap = {};
 
-            processedRecords.forEach(r => {
+            rows.forEach(r => {
                 if (r.parent_id) {
                     if (!childrenMap[r.parent_id]) childrenMap[r.parent_id] = [];
                     childrenMap[r.parent_id].push(r);
@@ -78,7 +27,7 @@ function getFilteredTreeRecords(userId, queryParams, db) {
             });
 
             // Handle orphans (children whose parent is deleted)
-            processedRecords.forEach(r => {
+            rows.forEach(r => {
                 if (r.parent_id && !topLevelMap[r.parent_id]) {
                     r._aggDailyCost = r._dailyCost;
                     r._aggFinalCost = r._finalCost;

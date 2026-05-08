@@ -46,6 +46,72 @@ const db = new sqlite3.Database(DB_PATH, (err) => {
             db.run("ALTER TABLE records ADD COLUMN expected_lifespan INTEGER DEFAULT 1095", (err) => { });
             db.run("ALTER TABLE records ADD COLUMN expected_salvage REAL DEFAULT 0", (err) => { });
 
+            // --- PERFORMANCE: Create SQL View for Computed Columns ---
+            db.run(`CREATE VIEW IF NOT EXISTS v_records_computed AS
+SELECT
+    *,
+    CASE
+        WHEN status != 'active' AND end_date IS NOT NULL THEN end_date
+        ELSE date('now', 'localtime')
+    END as computed_end_date,
+
+    CAST(
+        MAX(0,
+            julianday(
+                CASE
+                    WHEN status != 'active' AND end_date IS NOT NULL THEN end_date
+                    ELSE date('now', 'localtime')
+                END
+            ) - julianday(date(purchase_date))
+        )
+    AS INTEGER) + 1 as _days,
+
+    CASE
+        WHEN status = 'sold' THEN MAX(0, price - IFNULL(resale_price, 0))
+        ELSE price
+    END as _finalCost,
+
+    (
+        CASE
+            WHEN status = 'sold' THEN MAX(0, price - IFNULL(resale_price, 0))
+            ELSE price
+        END
+    ) * 1.0 /
+    (
+        CAST(
+            MAX(0,
+                julianday(
+                    CASE
+                        WHEN status != 'active' AND end_date IS NOT NULL THEN end_date
+                        ELSE date('now', 'localtime')
+                    END
+                ) - julianday(date(purchase_date))
+            )
+        AS INTEGER) + 1
+    ) as _dailyCost,
+
+    CASE
+        WHEN status = 'sold' THEN IFNULL(resale_price, 0)
+        WHEN status = 'broken' THEN 0
+        ELSE
+            CASE
+                WHEN IFNULL(depreciation_method, 'straight_line') = 'straight_line' THEN
+                    MAX(IFNULL(expected_salvage, 0),
+                        price - (
+                            (price - IFNULL(expected_salvage, 0)) / CAST(IFNULL(expected_lifespan, 1095) AS REAL) *
+                            (CAST(MAX(0, julianday(date('now', 'localtime')) - julianday(date(purchase_date))) AS INTEGER) + 1)
+                        )
+                    )
+                WHEN IFNULL(depreciation_method, 'straight_line') = 'double_declining' THEN
+                    MAX(IFNULL(expected_salvage, 0),
+                        price * pow(1.0 - (2.0 / CAST(IFNULL(expected_lifespan, 1095) AS REAL)),
+                        (CAST(MAX(0, julianday(date('now', 'localtime')) - julianday(date(purchase_date))) AS INTEGER) + 1))
+                    )
+                ELSE price
+            END
+    END as _currentValue
+FROM records;`);
+
             // --- PERFORMANCE: Create Indexes ---
             db.run("CREATE INDEX IF NOT EXISTS idx_records_user_list ON records(user_id, is_deleted, created_at)");
             db.run("CREATE INDEX IF NOT EXISTS idx_records_parent ON records(parent_id)");
