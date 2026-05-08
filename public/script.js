@@ -109,6 +109,25 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
+    // Advanced Toggles (Progressive Disclosure)
+    const editAdvancedToggle = document.getElementById('editAdvancedToggle');
+    const editAdvancedContent = document.getElementById('editAdvancedContent');
+    if (editAdvancedToggle && editAdvancedContent) {
+        editAdvancedToggle.addEventListener('click', () => {
+            editAdvancedContent.classList.toggle('hidden');
+            editAdvancedToggle.classList.toggle('open');
+        });
+    }
+
+    const addAdvancedToggle = document.getElementById('addAdvancedToggle');
+    const addAdvancedContent = document.getElementById('addAdvancedContent');
+    if (addAdvancedToggle && addAdvancedContent) {
+        addAdvancedToggle.addEventListener('click', () => {
+            addAdvancedContent.classList.toggle('hidden');
+            addAdvancedToggle.classList.toggle('open');
+        });
+    }
+
     // History
     const historyList = document.getElementById('historyList');
     const filterSelect = document.getElementById('filterSelect');

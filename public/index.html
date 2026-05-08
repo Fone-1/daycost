@@ -438,23 +438,28 @@
                     </div>
                 </section>
 
-                <section class="form-section">
-                    <h3>折旧设置 <button type="button" class="inline-info-btn" id="depreciationInfoBtn1">说明</button></h3>
-                    <div class="form-group">
-                        <label for="statusEditDepreciationMethod">折旧算法</label>
-                        <select id="statusEditDepreciationMethod" class="sort-select">
-                            <option value="straight_line">直线折旧法</option>
-                            <option value="double_declining">双倍余额递减法</option>
-                        </select>
-                    </div>
-                    <div class="form-grid two">
+                <section class="form-section advanced-section">
+                    <h3 class="advanced-toggle" id="editAdvancedToggle">
+                        <span>高级选项（折旧算法） <button type="button" class="inline-info-btn" id="depreciationInfoBtn1">说明</button></span>
+                        <span class="toggle-icon">▼</span>
+                    </h3>
+                    <div class="advanced-content hidden" id="editAdvancedContent">
                         <div class="form-group">
-                            <label for="statusEditExpectedLifespan">预计寿命（天）</label>
-                            <input type="number" id="statusEditExpectedLifespan" min="1" required>
+                            <label for="statusEditDepreciationMethod">折旧算法</label>
+                            <select id="statusEditDepreciationMethod" class="sort-select">
+                                <option value="straight_line">直线折旧法</option>
+                                <option value="double_declining">双倍余额递减法</option>
+                            </select>
                         </div>
-                        <div class="form-group">
-                            <label for="statusEditExpectedSalvage">预计残值（元）</label>
-                            <input type="number" id="statusEditExpectedSalvage" min="0" step="0.01" required>
+                        <div class="form-grid two">
+                            <div class="form-group">
+                                <label for="statusEditExpectedLifespan">预计寿命（天）</label>
+                                <input type="number" id="statusEditExpectedLifespan" min="1" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="statusEditExpectedSalvage">预计残值（元）</label>
+                                <input type="number" id="statusEditExpectedSalvage" min="0" step="0.01" required>
+                            </div>
                         </div>
                     </div>
                 </section>
@@ -594,23 +599,28 @@
                     </div>
                 </section>
 
-                <section class="form-section">
-                    <h3>折旧设置 <button type="button" class="inline-info-btn" id="depreciationInfoBtn2">说明</button></h3>
-                    <div class="form-group">
-                        <label for="formDepreciationMethod">折旧算法</label>
-                        <select id="formDepreciationMethod" class="sort-select">
-                            <option value="straight_line">直线折旧法</option>
-                            <option value="double_declining">双倍余额递减法</option>
-                        </select>
-                    </div>
-                    <div class="form-grid two">
+                <section class="form-section advanced-section">
+                    <h3 class="advanced-toggle" id="addAdvancedToggle">
+                        <span>高级选项（折旧算法） <button type="button" class="inline-info-btn" id="depreciationInfoBtn2">说明</button></span>
+                        <span class="toggle-icon">▼</span>
+                    </h3>
+                    <div class="advanced-content hidden" id="addAdvancedContent">
                         <div class="form-group">
-                            <label for="formExpectedLifespan">预计寿命（天）</label>
-                            <input type="number" id="formExpectedLifespan" min="1" value="1095" placeholder="1095">
+                            <label for="formDepreciationMethod">折旧算法</label>
+                            <select id="formDepreciationMethod" class="sort-select">
+                                <option value="straight_line">直线折旧法</option>
+                                <option value="double_declining">双倍余额递减法</option>
+                            </select>
                         </div>
-                        <div class="form-group">
-                            <label for="formExpectedSalvage">预计残值（元）</label>
-                            <input type="number" id="formExpectedSalvage" min="0" step="0.01" value="0" placeholder="0.00">
+                        <div class="form-grid two">
+                            <div class="form-group">
+                                <label for="formExpectedLifespan">预计寿命（天）</label>
+                                <input type="number" id="formExpectedLifespan" min="1" value="1095" placeholder="1095">
+                            </div>
+                            <div class="form-group">
+                                <label for="formExpectedSalvage">预计残值（元）</label>
+                                <input type="number" id="formExpectedSalvage" min="0" step="0.01" value="0" placeholder="0.00">
+                            </div>
                         </div>
                     </div>
                 </section>

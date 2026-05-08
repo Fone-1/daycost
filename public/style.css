@@ -305,6 +305,30 @@ header p {
     margin-bottom: 0;
 }
 
+.advanced-toggle {
+    cursor: pointer;
+    user-select: none;
+    transition: color 0.2s;
+}
+
+.advanced-toggle:hover {
+    color: #93c5fd;
+}
+
+.advanced-toggle .toggle-icon {
+    font-size: 0.8em;
+    transition: transform 0.3s ease;
+}
+
+.advanced-toggle.open .toggle-icon {
+    transform: rotate(180deg);
+}
+
+.advanced-content {
+    margin-top: 1rem;
+    animation: fadeIn 0.3s ease-out;
+}
+
 .form-grid {
     display: grid;
     gap: 10px;
