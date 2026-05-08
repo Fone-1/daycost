@@ -39,12 +39,13 @@ const recordsRoutes = require('./src/routes/records');
 const statsRoutes = require('./src/routes/stats');
 const adminRoutes = require('./src/routes/admin');
 const totpRoutes = require('./src/routes/totp');
+const xssClean = require('./src/middlewares/xssClean');
 
 app.use('/api/auth', authRoutes);
-app.use('/api/records', recordsRoutes);
-app.use('/api/stats', statsRoutes);
+app.use('/api/records', xssClean, recordsRoutes);
+app.use('/api/stats', xssClean, statsRoutes);
 app.use('/api/admin', adminRoutes);
-app.use('/api/totp', totpRoutes);
+app.use('/api/totp', xssClean, totpRoutes);
 
 // Catch-all route for sending index.html
 app.use((req, res) => {
