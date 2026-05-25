@@ -40,12 +40,17 @@ const statsRoutes = require('./src/routes/stats');
 const adminRoutes = require('./src/routes/admin');
 const totpRoutes = require('./src/routes/totp');
 const xssClean = require('./src/middlewares/xssClean');
+const { apiLimiter } = require('./src/middlewares/rateLimit');
+
+// Apply security middleware globally to all API routes
+app.use('/api', xssClean);
+app.use('/api', apiLimiter);
 
 app.use('/api/auth', authRoutes);
-app.use('/api/records', xssClean, recordsRoutes);
-app.use('/api/stats', xssClean, statsRoutes);
+app.use('/api/records', recordsRoutes);
+app.use('/api/stats', statsRoutes);
 app.use('/api/admin', adminRoutes);
-app.use('/api/totp', xssClean, totpRoutes);
+app.use('/api/totp', totpRoutes);
 
 // Catch-all route for sending index.html
 app.use((req, res) => {

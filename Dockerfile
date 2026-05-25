@@ -25,7 +25,7 @@ RUN mkdir -p /data
 # Default environment variables
 ENV NODE_ENV=production
 ENV PORT=80
-ENV DB_PATH=/data/daycost.db
+ENV DB_PATH=/data/data.db
 ENV JWT_SECRET=change_this_to_something_secure_in_azure_portal
 
 # Expose port 80

@@ -129,28 +129,28 @@ router.post('/', authenticateToken, (req, res) => {
     const normalizedSalvage = Number(expected_salvage || 0);
 
     if (!item_name || price == null || !purchase_date) {
-        return res.status(400).json({ error: 'Please provide item name, price and purchase date.' });
+        return res.status(400).json({ error: '请填写物品名称、价格和购买日期。' });
     }
     if (!['active', 'broken', 'sold'].includes(normalizedStatus)) {
-        return res.status(400).json({ error: 'Invalid status.' });
+        return res.status(400).json({ error: '无效的状态。' });
     }
     if (!Number.isFinite(normalizedPrice) || normalizedPrice < 0) {
-        return res.status(400).json({ error: 'Price must be a non-negative number.' });
+        return res.status(400).json({ error: '价格必须为非负数。' });
     }
     if (!Number.isFinite(normalizedResale) || normalizedResale < 0 || normalizedResale > normalizedPrice) {
-        return res.status(400).json({ error: 'Resale price must be between 0 and item price.' });
+        return res.status(400).json({ error: '二手价格必须在 0 到物品价格之间。' });
     }
     if (!Number.isFinite(normalizedLifespan) || normalizedLifespan < 1) {
-        return res.status(400).json({ error: 'Expected lifespan must be at least 1 day.' });
+        return res.status(400).json({ error: '预期寿命至少为 1 天。' });
     }
     if (!Number.isFinite(normalizedSalvage) || normalizedSalvage < 0 || normalizedSalvage > normalizedPrice) {
-        return res.status(400).json({ error: 'Expected salvage must be between 0 and item price.' });
+        return res.status(400).json({ error: '预期残值必须在 0 到物品价格之间。' });
     }
     if ((normalizedStatus === 'broken' || normalizedStatus === 'sold') && !end_date) {
-        return res.status(400).json({ error: 'End date is required for broken or sold records.' });
+        return res.status(400).json({ error: '损坏或已售记录需要填写结束日期。' });
     }
     if (end_date && new Date(end_date) < new Date(purchase_date)) {
-        return res.status(400).json({ error: 'End date cannot be earlier than purchase date.' });
+        return res.status(400).json({ error: '结束日期不能早于购买日期。' });
     }
 
     const executeInsert = () => {
@@ -158,8 +158,8 @@ router.post('/', authenticateToken, (req, res) => {
             `INSERT INTO records (user_id, item_name, price, purchase_date, status, end_date, resale_price, parent_id, tags, depreciation_method, expected_lifespan, expected_salvage) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             [req.user.id, item_name, normalizedPrice, purchase_date, normalizedStatus, end_date || null, normalizedResale, parent_id || null, tags || '', depreciation_method || 'straight_line', normalizedLifespan, normalizedSalvage],
             function (err) {
-                if (err) return res.status(500).json({ error: 'Failed to add record.' });
-                res.json({ message: 'Record added.', id: this.lastID });
+                if (err) return res.status(500).json({ error: '添加记录失败。' });
+                res.json({ message: '记录已添加。', id: this.lastID });
             }
         );
     };
@@ -167,9 +167,9 @@ router.post('/', authenticateToken, (req, res) => {
     if (!parent_id) return executeInsert();
 
     db.get(`SELECT id, parent_id FROM records WHERE id = ? AND user_id = ? AND is_deleted = 0`, [parent_id, req.user.id], (err, row) => {
-        if (err) return res.status(500).json({ error: 'Failed to validate parent record.' });
-        if (!row) return res.status(400).json({ error: 'Parent record does not exist.' });
-        if (row.parent_id) return res.status(400).json({ error: 'Only one nested level is supported.' });
+        if (err) return res.status(500).json({ error: '验证父记录失败。' });
+        if (!row) return res.status(400).json({ error: '父记录不存在。' });
+        if (row.parent_id) return res.status(400).json({ error: '仅支持一级嵌套。' });
         executeInsert();
     });
 });
@@ -185,34 +185,34 @@ router.put('/:id', authenticateToken, (req, res) => {
     const normalizedParentId = parent_id ? Number(parent_id) : null;
 
     if (!item_name || price == null || !purchase_date) {
-        return res.status(400).json({ error: 'Please provide item name, price and purchase date.' });
+        return res.status(400).json({ error: '请填写物品名称、价格和购买日期。' });
     }
     if (!['active', 'broken', 'sold'].includes(status)) {
-        return res.status(400).json({ error: 'Invalid status.' });
+        return res.status(400).json({ error: '无效的状态。' });
     }
     if (!Number.isFinite(recordId) || recordId < 1) {
-        return res.status(400).json({ error: 'Invalid record id.' });
+        return res.status(400).json({ error: '无效的记录 ID。' });
     }
     if (!Number.isFinite(normalizedPrice) || normalizedPrice < 0) {
-        return res.status(400).json({ error: 'Price must be a non-negative number.' });
+        return res.status(400).json({ error: '价格必须为非负数。' });
     }
     if (!Number.isFinite(normalizedResale) || normalizedResale < 0 || normalizedResale > normalizedPrice) {
-        return res.status(400).json({ error: 'Resale price must be between 0 and item price.' });
+        return res.status(400).json({ error: '二手价格必须在 0 到物品价格之间。' });
     }
     if (!Number.isFinite(normalizedLifespan) || normalizedLifespan < 1) {
-        return res.status(400).json({ error: 'Expected lifespan must be at least 1 day.' });
+        return res.status(400).json({ error: '预期寿命至少为 1 天。' });
     }
     if (!Number.isFinite(normalizedSalvage) || normalizedSalvage < 0 || normalizedSalvage > normalizedPrice) {
-        return res.status(400).json({ error: 'Expected salvage must be between 0 and item price.' });
+        return res.status(400).json({ error: '预期残值必须在 0 到物品价格之间。' });
     }
     if ((status === 'broken' || status === 'sold') && !end_date) {
-        return res.status(400).json({ error: 'End date is required for broken or sold records.' });
+        return res.status(400).json({ error: '损坏或已售记录需要填写结束日期。' });
     }
     if (end_date && new Date(end_date) < new Date(purchase_date)) {
-        return res.status(400).json({ error: 'End date cannot be earlier than purchase date.' });
+        return res.status(400).json({ error: '结束日期不能早于购买日期。' });
     }
     if (normalizedParentId === recordId) {
-        return res.status(400).json({ error: 'A record cannot be its own parent.' });
+        return res.status(400).json({ error: '记录不能作为自身的父级。' });
     }
 
     const executeUpdate = () => {
@@ -224,20 +224,20 @@ router.put('/:id', authenticateToken, (req, res) => {
                 function (err) {
                     if (err) {
                         db.run('ROLLBACK;');
-                        return res.status(500).json({ error: 'Failed to update record.' });
+                        return res.status(500).json({ error: '更新记录失败。' });
                     }
                     if (this.changes === 0) {
                         db.run('ROLLBACK;');
-                        return res.status(404).json({ error: 'Record not found.' });
+                        return res.status(404).json({ error: '记录不存在。' });
                     }
 
                     const finish = () => {
                         db.run('COMMIT;', (commitErr) => {
                             if (commitErr) {
                                 db.run('ROLLBACK;');
-                                return res.status(500).json({ error: 'Failed to commit record update.' });
+                                return res.status(500).json({ error: '提交更新失败。' });
                             }
-                            res.json({ message: 'Record updated.' });
+                            res.json({ message: '记录已更新。' });
                         });
                     };
 
@@ -248,7 +248,7 @@ router.put('/:id', authenticateToken, (req, res) => {
                             (cascadeErr) => {
                                 if (cascadeErr) {
                                     db.run('ROLLBACK;');
-                                    return res.status(500).json({ error: 'Failed to update child records.' });
+                                    return res.status(500).json({ error: '更新子记录失败。' });
                                 }
                                 finish();
                             }
@@ -260,7 +260,7 @@ router.put('/:id', authenticateToken, (req, res) => {
                             (orphanErr) => {
                                 if (orphanErr) {
                                     db.run('ROLLBACK;');
-                                    return res.status(500).json({ error: 'Failed to detach child records.' });
+                                    return res.status(500).json({ error: '解除子记录关联失败。' });
                                 }
                                 finish();
                             }
@@ -276,15 +276,15 @@ router.put('/:id', authenticateToken, (req, res) => {
     if (!normalizedParentId) return executeUpdate();
 
     db.get(`SELECT COUNT(*) as count FROM records WHERE parent_id = ? AND user_id = ? AND is_deleted = 0`, [recordId, req.user.id], (childErr, childRow) => {
-        if (childErr) return res.status(500).json({ error: 'Failed to validate child records.' });
+        if (childErr) return res.status(500).json({ error: '验证子记录失败。' });
         if (childRow && childRow.count > 0) {
-            return res.status(400).json({ error: 'A record with children cannot be nested under another record.' });
+            return res.status(400).json({ error: '含有子记录的物品不能嵌套到其他物品下。' });
         }
 
         db.get(`SELECT id, parent_id FROM records WHERE id = ? AND user_id = ? AND is_deleted = 0`, [normalizedParentId, req.user.id], (parentErr, parentRow) => {
-            if (parentErr) return res.status(500).json({ error: 'Failed to validate parent record.' });
-            if (!parentRow) return res.status(400).json({ error: 'Parent record does not exist.' });
-            if (parentRow.parent_id) return res.status(400).json({ error: 'Only one nested level is supported.' });
+            if (parentErr) return res.status(500).json({ error: '验证父记录失败。' });
+            if (!parentRow) return res.status(400).json({ error: '父记录不存在。' });
+            if (parentRow.parent_id) return res.status(400).json({ error: '仅支持一级嵌套。' });
             executeUpdate();
         });
     });
@@ -294,10 +294,10 @@ router.put('/:id', authenticateToken, (req, res) => {
 router.post('/import', authenticateToken, (req, res) => {
     const { mode, records } = req.body;
     if (!['append', 'overwrite'].includes(mode)) {
-        return res.status(400).json({ error: 'Invalid import mode.' });
+        return res.status(400).json({ error: '无效的导入模式。' });
     }
     if (!Array.isArray(records)) {
-        return res.status(400).json({ error: 'Invalid import records.' });
+        return res.status(400).json({ error: '无效的导入数据。' });
     }
 
     db.serialize(() => {
@@ -320,11 +320,11 @@ router.post('/import', authenticateToken, (req, res) => {
                 const normalizedLifespan = Number(r.expected_lifespan || 1095);
                 const normalizedSalvage = Number(r.expected_salvage || 0);
 
-                if (!r.purchase_date) return callback(new Error('Record is missing purchase_date.'));
-                if (!Number.isFinite(normalizedPrice) || normalizedPrice < 0) return callback(new Error('Invalid price.'));
-                if (!Number.isFinite(normalizedResale) || normalizedResale < 0 || normalizedResale > normalizedPrice) return callback(new Error('Invalid resale price.'));
-                if (!Number.isFinite(normalizedLifespan) || normalizedLifespan < 1) return callback(new Error('Invalid lifespan.'));
-                if (!Number.isFinite(normalizedSalvage) || normalizedSalvage < 0 || normalizedSalvage > normalizedPrice) return callback(new Error('Invalid salvage value.'));
+                if (!r.purchase_date) return callback(new Error('记录缺少购买日期。'));
+                if (!Number.isFinite(normalizedPrice) || normalizedPrice < 0) return callback(new Error('无效的价格。'));
+                if (!Number.isFinite(normalizedResale) || normalizedResale < 0 || normalizedResale > normalizedPrice) return callback(new Error('无效的二手价格。'));
+                if (!Number.isFinite(normalizedLifespan) || normalizedLifespan < 1) return callback(new Error('无效的预期寿命。'));
+                if (!Number.isFinite(normalizedSalvage) || normalizedSalvage < 0 || normalizedSalvage > normalizedPrice) return callback(new Error('无效的残值。'));
 
                 const sql = `
                     INSERT INTO records (user_id, item_name, price, purchase_date, status, end_date, resale_price, parent_id, tags, depreciation_method, expected_lifespan, expected_salvage)
@@ -353,7 +353,7 @@ router.post('/import', authenticateToken, (req, res) => {
                 if (index >= parents.length) return done();
                 const parent = parents[index];
                 insertRecord(parent, null, (err, newId) => {
-                    if (err) return rollback('Failed to import parent records.');
+                    if (err) return rollback('导入父记录失败。');
                     oldToNewMap[parent.id] = newId;
                     processParents(index + 1, done);
                 });
@@ -364,7 +364,7 @@ router.post('/import', authenticateToken, (req, res) => {
                 const child = children[index];
                 const mappedParentId = oldToNewMap[child.parent_id] || null;
                 insertRecord(child, mappedParentId, (err) => {
-                    if (err) return rollback('Failed to import child records.');
+                    if (err) return rollback('导入子记录失败。');
                     processChildren(index + 1, done);
                 });
             };
@@ -372,8 +372,8 @@ router.post('/import', authenticateToken, (req, res) => {
             processParents(0, () => {
                 processChildren(0, () => {
                     db.run('COMMIT;', (err) => {
-                        if (err) return rollback('Failed to commit import.');
-                        res.json({ message: 'Import completed.' });
+                        if (err) return rollback('提交导入失败。');
+                        res.json({ message: '导入完成。' });
                     });
                 });
             });
@@ -381,7 +381,7 @@ router.post('/import', authenticateToken, (req, res) => {
 
         if (mode === 'overwrite') {
             db.run('DELETE FROM records WHERE user_id = ?', [req.user.id], (deleteErr) => {
-                if (deleteErr) return rollback('Failed to clear existing records.');
+                if (deleteErr) return rollback('清空现有记录失败。');
                 startImport();
             });
         } else {

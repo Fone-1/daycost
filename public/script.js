@@ -1,4 +1,4 @@
-// --- PWA Service Worker Registration ---
+﻿// --- PWA Service Worker Registration ---
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
         navigator.serviceWorker.register('/sw.js')
@@ -794,33 +794,6 @@ document.addEventListener('DOMContentLoaded', () => {
         statusModal.classList.remove('hidden');
     };
 
-    window.deleteRecord = function (id) {
-        const record = globalRecords.find(r => r.id === id);
-        if (!record) return;
-
-        showAppConfirm(
-            '移入废纸篓？',
-            `您确定要将 「${record.item_name}」 移入废纸篓吗？\n(注意：如果有子零件需先解除绑定才能删除)`,
-            async () => {
-                try {
-                    const res = await fetch(`/api/records/${id}`, {
-                        method: 'DELETE',
-                        headers: getHeaders()
-                    });
-                    const data = await res.json();
-                    if (res.ok) {
-                        loadHistory();
-                        loadStats();
-                    } else {
-                        showAppAlert(data.error);
-                    }
-                } catch (e) {
-                    showAppAlert('操作失败');
-                }
-            },
-            '确认删除'
-        );
-    };
 
     function updateParentDropdowns() {
         const topLevelRecords = globalRecords.filter(r => !r.parent_id);
@@ -859,14 +832,6 @@ document.addEventListener('DOMContentLoaded', () => {
         );
     };
 
-    function updateParentDropdowns() {
-        const topLevelRecords = globalRecords.filter(r => !r.parent_id);
-        const optionsHtml = '<option value="">- 独立物品 -</option>' +
-            topLevelRecords.map(r => `<option value="${r.id}">${escapeHtml(r.item_name || '未命名')}</option>`).join('');
-
-        parentSelect.innerHTML = optionsHtml;
-        statusEditParentId.innerHTML = optionsHtml;
-    }
 
     async function loadStats() {
         const globalStatsBox = document.getElementById('globalStatsBox');
@@ -1128,63 +1093,6 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // Helper to generate a single historic item HTML
-    function createItemHtml(record, isChild = false) {
-        const status = record.status || 'active';
-        let classModifiers = isChild ? 'child-item' : '';
-        if (status === 'broken') classModifiers += ' broken';
-        if (status === 'sold') classModifiers += ' sold';
-
-        let badges = '';
-        let tagBadges = '';
-
-        const dailyCost = record._aggDailyCost !== undefined ? record._aggDailyCost : record._dailyCost;
-        const price = record._aggPrice !== undefined ? record._aggPrice : record.price;
-        const days = record._aggDays !== undefined ? record._aggDays : record._days;
-        const finalCost = record._aggFinalCost !== undefined ? record._aggFinalCost : record._finalCost;
-        const currentValue = record._aggCurrentValue !== undefined ? record._aggCurrentValue : record._currentValue;
-
-        const priceLabel = isChild ? '零件单价' : '组合总价';
-        let metaHtml = `${priceLabel} ￥${price.toFixed(2)}${isChild ? '' : ` · 已用 ${days} 天`}`;
-
-        if (status === 'broken') {
-            badges = '<span class="status-badge bg-red">已损坏</span>';
-        } else if (status === 'sold') {
-            badges = '<span class="status-badge bg-yellow">已回血</span>';
-            const resaleLabel = isChild ? '零件折损' : '组合折损';
-            metaHtml = `${resaleLabel} ￥${finalCost.toFixed(2)} (售￥${record.resale_price}) · 定格 ${days}天`;
-        } else {
-            metaHtml += ` · 估值 ￥${(currentValue || 0).toFixed(2)}`;
-        }
-
-        if (record.tags) {
-            const tagsArr = record.tags.split(/[,，\s]+/).map(t => t.trim()).filter(t => t);
-            tagsArr.forEach(t => {
-                const cleanTag = t.startsWith('#') ? t : '#' + t;
-                tagBadges += `<span class="tag-badge">${cleanTag}</span>`;
-            });
-        }
-
-        return `
-            <div class="history-item ${classModifiers}" data-id="${record.id}">
-                <div class="swipe-wrapper" ontouchstart="handleSwipeStart(event)" ontouchmove="handleSwipeMove(event)" ontouchend="handleSwipeEnd(event)">
-                    <div class="swipe-content">
-                        <div class="history-info">
-                            <span class="history-name" data-fulltext="${record.item_name}">${record.item_name} ${badges}${tagBadges}</span>
-                            <span class="history-meta" data-fulltext="${metaHtml.replace(/￥/g, '\xA5')}">${metaHtml}</span>
-                        </div>
-                        <div class="history-cost">
-                            <div class="history-cost-val">￥${dailyCost.toFixed(2)}<span>/天</span></div>
-                        </div>
-                    </div>
-                    <div class="swipe-actions">
-                        <button class="status-btn" data-action="edit" data-record-id="${record.id}" title="修改">⚙️</button>
-                        ${isChild ? '' : `<button class="delete-btn" data-action="delete" data-record-id="${record.id}" title="删除">🗑️</button>`}
-                    </div>
-                </div>
-            </div>
-        `;
-    }
 
     function escapeHtml(value) {
         return String(value ?? '')
@@ -1528,139 +1436,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const importChoiceModal = document.getElementById('importChoiceModal');
     let tempDataToImport = null;
 
-    if (exportCsvBtn) {
-        exportCsvBtn.addEventListener('click', () => {
-            if (!globalRecords || globalRecords.length === 0) {
-                showAppAlert('没有可导出的数据');
-                return;
-            }
-
-            const headers = ['ID', '归属组合ID', '物品名称', '花费金额', '购买日期', '状态', '记录时间', '结束日期', '回血残值', '日均成本(算后)', '总天数(算后)', '最终折算金额(算后)'];
-
-            const rows = globalRecords.map(r => {
-                const statusMap = { 'active': '使用中', 'broken': '已损坏', 'sold': '已售出' };
-                const statusStr = statusMap[r.status] || '使用中';
-                return [
-                    r.id,
-                    r.parent_id || '',
-                    `"${r.item_name}"`,
-                    r.price,
-                    r.purchase_date,
-                    statusStr,
-                    r.created_at,
-                    r.end_date || '',
-                    r.resale_price || 0,
-                    r._dailyCost?.toFixed(2) || '',
-                    r._days || '',
-                    r._finalCost?.toFixed(2) || ''
-                ];
-            });
-
-            let csvContent = "data:text/csv;charset=utf-8,\uFEFF" + headers.join(',') + "\n";
-            rows.forEach(rowArray => {
-                const row = rowArray.join(",");
-                csvContent += row + "\r\n";
-            });
-
-            const encodedUri = encodeURI(csvContent);
-            const link = document.createElement("a");
-            link.setAttribute("href", encodedUri);
-            link.setAttribute("download", `DayCost_Export_${new Date().toISOString().split('T')[0]}.csv`);
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-        });
-    }
-
-    if (backupExportBtn) {
-        backupExportBtn.addEventListener('click', () => {
-            if (!globalRecords || globalRecords.length === 0) {
-                showAppAlert('没有可导出的数据');
-                return;
-            }
-
-            // Exclude calculated frontend local values (_*)
-            const cleanRecords = globalRecords.map(r => {
-                const clean = { ...r };
-                for (let key in clean) {
-                    if (key.startsWith('_')) delete clean[key];
-                }
-                return clean;
-            });
-
-            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(cleanRecords, null, 2));
-            const link = document.createElement("a");
-            link.setAttribute("href", dataStr);
-            link.setAttribute("download", `DayCost_Backup_${new Date().toISOString().split('T')[0]}.daycost`);
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-        });
-    }
-
-    if (backupImportBtn) {
-        backupImportBtn.addEventListener('click', () => {
-            importFileInput.value = '';
-            importFileInput.click();
-        });
-    }
-
-    if (importFileInput) {
-        importFileInput.addEventListener('change', (e) => {
-            const file = e.target.files[0];
-            if (!file) return;
-
-            const reader = new FileReader();
-            reader.onload = function (evt) {
-                try {
-                    const json = JSON.parse(evt.target.result);
-                    if (!Array.isArray(json)) throw new Error('无效的文件格式');
-                    tempDataToImport = json;
-                    importChoiceModal.classList.remove('hidden');
-                } catch (err) {
-                    showAppAlert('解析备份文件失败: ' + err.message);
-                }
-            };
-            reader.readAsText(file);
-        });
-    }
-
-    if (importChoiceModal) {
-        document.getElementById('importCancelBtn').addEventListener('click', () => {
-            importChoiceModal.classList.add('hidden');
-            tempDataToImport = null;
-        });
-
-        async function executeImport(mode) {
-            importChoiceModal.classList.add('hidden');
-            if (!tempDataToImport) return;
-
-            try {
-                const res = await fetch('/api/records/import', {
-                    method: 'POST',
-                    headers: getHeaders(),
-                    body: JSON.stringify({
-                        mode: mode,
-                        records: tempDataToImport
-                    })
-                });
-                const data = await res.json();
-                if (res.ok) {
-                    showAppAlert('数据恢复成功！');
-                    loadHistory();
-                } else {
-                    showAppAlert(data.error);
-                }
-            } catch (e) {
-                showAppAlert('导入请求失败');
-            } finally {
-                tempDataToImport = null;
-            }
-        }
-
-        document.getElementById('importOverwriteBtn').addEventListener('click', () => executeImport('overwrite'));
-        document.getElementById('importAppendBtn').addEventListener('click', () => executeImport('append'));
-    }
 
     // --- Trash / Recycle Bin Logic ---
     async function loadTrash() {
@@ -1675,157 +1450,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    function renderTrash() {
-        const trashRows = globalTrashRecords.map(record => {
-            // Calculate days left (30 days total)
-            const deletedDate = new Date(record.deleted_at);
-            const now = new Date();
-            const diffTime = now - deletedDate;
-            const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-            const daysLeft = Math.max(0, 30 - diffDays);
-
-            let countdownClass = 'status-badge';
-            if (daysLeft <= 3) countdownClass += ' bg-red';
-            else if (daysLeft <= 7) countdownClass += ' bg-yellow';
-            else countdownClass += ' bg-blue';
-
-            const countdownBadge = `<span class="${countdownClass}" style="margin-left: 8px;">${daysLeft}天后清理</span>`;
-
-            return `
-                <div class="record-wrapper">
-                    <div class="history-item deleted">
-                        <div class="history-info">
-                            <span class="history-name" style="color: #cbd5e1;">${record.item_name} ${countdownBadge}</span>
-                            <span class="history-meta" style="color: #64748b;">买入 ¥${record.price.toFixed(2)} · 删于 ${record.deleted_at ? record.deleted_at.split(' ')[0] : '未知'}</span>
-                        </div>
-                        <div class="history-actions" style="display: flex; gap: 8px;">
-                            <button class="status-btn" data-action="restore" data-record-id="${record.id}" title="还原记录" style="background: rgba(16, 185, 129, 0.15); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.2); padding: 5px 12px; border-radius: 10px;">↩️</button>
-                            <button class="delete-btn" data-action="purge" data-record-id="${record.id}" title="粉碎销毁" style="background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.2); color: #ef4444; padding: 5px 12px; border-radius: 10px;">🔥</button>
-                        </div>
-                    </div>
-                </div>
-            `;
-        });
-
-        if (trashRows.length === 0) {
-            trashRows.push('<div style="text-align:center; color:#94a3b8; padding: 40px;">废纸篓空空如也</div>');
-        }
-
-        if (!trashClusterizeInstance) {
-            trashClusterizeInstance = new Clusterize({
-                rows: trashRows,
-                scrollId: 'trashListScroll',
-                contentId: 'trashListContent'
-            });
-        } else {
-            trashClusterizeInstance.update(trashRows);
-        }
-    }
-
-    window.restoreRecord = async function (id) {
-        try {
-            const res = await fetch(`/api/records/restore/${id}`, { method: 'POST', headers: getHeaders() });
-            const data = await res.json();
-            if (res.ok) {
-                showAppAlert('记录已还原到主页', 'success');
-                loadTrash();
-                loadHistory();
-                loadStats();
-            } else {
-                showAppAlert(data.error || '还原失败：记录可能已过期');
-            }
-        } catch (e) {
-            console.error(e);
-            showAppAlert('网络故障，请稍后再试');
-        }
-    };
-
-    window.purgeRecord = function (id) {
-        showAppConfirm('彻底粉碎记录？', '此操作无法撤销，数据将永久从云端抹除。', async () => {
-            try {
-                const res = await fetch(`/api/records/purge/${id}`, { method: 'DELETE', headers: getHeaders() });
-                if (res.ok) {
-                    showAppAlert('记录已永久销毁');
-                    loadTrash();
-                } else {
-                    const data = await res.json();
-                    showAppAlert(data.error || '销毁过程中遇到问题');
-                }
-            } catch (e) {
-                console.error(e);
-                showAppAlert('销毁失败');
-            }
-        });
-    };
-    
-    // --- ADMIN DASHBOARD ---
-    
-    window.loadAdminUsers = async function() {
-        const tbody = document.getElementById('adminUsersList');
-        if (!tbody) return;
-        
-        tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; color: #94a3b8; padding: 20px;">数据加载中...</td></tr>';
-        
-        try {
-            const res = await fetch('/api/admin/users', { headers: getHeaders() });
-            const data = await res.json();
-            
-            if (!res.ok) throw new Error(data.error || '获取用户列表失败');
-            
-            if (!data.data || data.data.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; color: #94a3b8; padding: 20px;">暂无用户数据</td></tr>';
-                return;
-            }
-            
-            tbody.innerHTML = '';
-            
-            data.data.forEach(u => {
-                const tr = document.createElement('tr');
-                tr.style.borderBottom = '1px solid rgba(255,255,255,0.05)';
-                
-                const roleBadge = u.role === 'admin' 
-                    ? '<span style="background: rgba(239, 68, 68, 0.2); color: #ef4444; padding: 2px 8px; border-radius: 12px; font-size: 0.8rem;">管理员</span>'
-                    : '<span style="background: rgba(59, 130, 246, 0.2); color: #3b82f6; padding: 2px 8px; border-radius: 12px; font-size: 0.8rem;">普通用户</span>';
-                
-                const safeUsername = escapeHtml(u.username);
-                const delBtn = u.role === 'admin'
-                    ? '<span style="color: #64748b; font-size: 0.8rem;">不可处决</span>'
-                    : `<button onclick="deleteAdminUser(${u.id}, '${safeUsername}')" style="background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.5); color: #fca5a5; padding: 4px 10px; border-radius: 6px; cursor: pointer; transition: 0.2s;">处决</button>`;
-
-                tr.innerHTML = `
-                    <td style="padding: 12px 10px; color: #94a3b8;">#${u.id}</td>
-                    <td style="padding: 12px 10px; font-weight: 600;">${safeUsername}</td>
-                    <td style="padding: 12px 10px;">${roleBadge}</td>
-                    <td style="padding: 12px 10px; color: #94a3b8;">${new Date(u.created_at).toLocaleDateString()}</td>
-                    <td style="padding: 12px 10px; color: #f8fafc;">${u.total_items} 件</td>
-                    <td style="padding: 12px 10px; color: #10b981;">¥${(u.total_spent || 0).toFixed(2)}</td>
-                    <td style="padding: 12px 10px; text-align: right;">${delBtn}</td>
-                `;
-                tbody.appendChild(tr);
-            });
-        } catch (e) {
-            tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; color: #ef4444; padding: 20px;">${escapeHtml(e.message)}</td></tr>`;
-        }
-    };
-    
-    window.deleteAdminUser = function(id, username) {
-        showAppConfirm('处决确认', `确定要彻底歼灭用户 [${username}] 及其名下所有的消费记录吗？此操作属于物理删除，无法通过废纸篓还原！`, async () => {
-            try {
-                const res = await fetch(`/api/admin/user/${id}`, {
-                    method: 'DELETE',
-                    headers: getHeaders()
-                });
-                const data = await res.json();
-                if (!res.ok) throw new Error(data.error || '处决失败');
-                
-                showAppAlert(data.message, 'success');
-                loadAdminUsers();
-            } catch (err) {
-                showAppAlert(err.message, 'error');
-            }
-        }, '确认物理删除');
-    };
-    
     // --- Stats dimension views and list linkage ---
     const statsViewMeta = {
         tag: { title: '标签日均成本分布', empty: '暂无标签数据。给物品添加标签后会在这里汇总。' },
@@ -2193,12 +1817,6 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    cloneButtonWithHandler(document.getElementById('backupImportBtn'), () => {
-        const input = document.getElementById('importFileInput');
-        if (!input) return;
-        input.value = '';
-        input.click();
-    });
 
     async function executeCleanImport(mode) {
         importChoiceModal.classList.add('hidden');
