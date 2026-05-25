@@ -1,13 +1,20 @@
 :root {
     color-scheme: dark;
-    --bg-color: #0f172a;
-    --text-color: #f8fafc;
-    --primary: #3b82f6;
-    --primary-hover: #2563eb;
-    --card-bg: rgba(30, 41, 59, 0.7);
-    --border-color: rgba(255, 255, 255, 0.1);
+    --bg-color: #0a0e1a;
+    --bg-surface: #111827;
+    --bg-elevated: #1a2236;
+    --text-color: #f1f5f9;
+    --text-secondary: #94a3b8;
+    --text-muted: #64748b;
+    --primary: #f59e0b;
+    --primary-hover: #d97706;
+    --primary-glow: rgba(245, 158, 11, 0.15);
+    --card-bg: rgba(17, 24, 39, 0.85);
+    --border-color: rgba(255, 255, 255, 0.06);
+    --border-hover: rgba(255, 255, 255, 0.12);
     --danger: #ef4444;
     --danger-hover: #dc2626;
+    --success: #10b981;
 }
 
 * {
@@ -17,12 +24,12 @@
 }
 
 body {
-    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    font-family: 'DM Sans', system-ui, -apple-system, sans-serif;
     background-color: var(--bg-color);
     background-image:
-        radial-gradient(at 0% 0%, hsla(253, 16%, 7%, 1) 0, transparent 50%),
-        radial-gradient(at 50% 0%, hsla(225, 39%, 30%, 1) 0, transparent 50%),
-        radial-gradient(at 100% 0%, hsla(339, 49%, 30%, 1) 0, transparent 50%);
+        radial-gradient(at 0% 0%, hsla(220, 25%, 8%, 1) 0, transparent 50%),
+        radial-gradient(at 50% 0%, hsla(35, 50%, 15%, 0.4) 0, transparent 50%),
+        radial-gradient(at 100% 0%, hsla(220, 30%, 12%, 1) 0, transparent 50%);
     background-attachment: fixed;
     color: var(--text-color);
     min-height: 100vh;
@@ -31,6 +38,10 @@ body {
     align-items: center;
     padding: 12px;
     padding-top: 3vh;
+}
+
+.font-mono {
+    font-family: 'JetBrains Mono', 'Fira Code', monospace;
 }
 
 /* SPA Navigation Layout */
@@ -68,7 +79,7 @@ body {
 .nav-brand {
     font-size: 1.3rem;
     font-weight: 700;
-    background: linear-gradient(to right, #60a5fa, #a78bfa);
+    background: linear-gradient(135deg, #f59e0b, #fbbf24);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     white-space: nowrap;
@@ -93,8 +104,9 @@ body {
 }
 
 .nav-btn.active {
-    background: rgba(255, 255, 255, 0.15);
-    color: white;
+    background: rgba(245, 158, 11, 0.12);
+    color: #fbbf24;
+    box-shadow: 0 0 12px rgba(245, 158, 11, 0.1);
 }
 
 .btn-small {
@@ -219,11 +231,12 @@ header {
 
 header h1 {
     font-size: 2.5rem;
-    font-weight: 600;
+    font-weight: 700;
     margin-bottom: 0.5rem;
-    background: linear-gradient(to right, #60a5fa, #a78bfa);
+    background: linear-gradient(135deg, #f59e0b, #fbbf24, #f97316);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
+    letter-spacing: -0.02em;
 }
 
 header p {
@@ -233,13 +246,18 @@ header p {
 
 .glass {
     background: var(--card-bg);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
     border: 1px solid var(--border-color);
-    border-radius: 20px;
+    border-radius: 16px;
     padding: 2rem;
-    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+    box-shadow: 0 8px 32px -8px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.03);
     overflow: visible;
+    transition: border-color 0.3s ease;
+}
+
+.glass:hover {
+    border-color: var(--border-hover);
 }
 
 .glass::-webkit-scrollbar {
@@ -340,14 +358,19 @@ header p {
 
 .inline-info-btn {
     width: auto;
-    border: 1px solid rgba(59, 130, 246, 0.35);
+    border: 1px solid rgba(245, 158, 11, 0.3);
     border-radius: 999px;
-    background: rgba(59, 130, 246, 0.12);
-    color: #93c5fd;
+    background: rgba(245, 158, 11, 0.1);
+    color: #fbbf24;
     padding: 3px 10px;
     font: inherit;
     font-size: 0.75rem;
     cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.inline-info-btn:hover {
+    background: rgba(245, 158, 11, 0.2);
 }
 
 label {
@@ -377,7 +400,7 @@ input:focus, select:focus {
     outline: none;
     border-color: var(--primary);
     background: rgba(15, 23, 42, 0.8);
-    box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.2);
+    box-shadow: 0 0 0 3px var(--primary-glow);
 }
 
 select {
@@ -409,29 +432,60 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
     padding: 1rem;
     border: none;
     border-radius: 10px;
-    background: var(--primary);
-    color: white;
-    font-size: 1.1rem;
-    font-weight: 600;
+    background: linear-gradient(135deg, #f59e0b, #d97706);
+    color: #0a0e1a;
+    font-size: 1.05rem;
+    font-weight: 700;
     cursor: pointer;
-    transition: background-color 0.3s, transform 0.1s;
+    transition: all 0.2s ease;
     margin-top: 1rem;
+    letter-spacing: 0.01em;
 }
 
 .btn:hover {
-    background: var(--primary-hover);
+    background: linear-gradient(135deg, #fbbf24, #f59e0b);
+    box-shadow: 0 4px 20px rgba(245, 158, 11, 0.3);
+    transform: translateY(-1px);
 }
 
 .btn:active {
-    transform: scale(0.98);
+    transform: scale(0.97) translateY(0);
+    box-shadow: none;
+}
+
+.btn.loading {
+    position: relative;
+    color: transparent;
+    pointer-events: none;
+}
+
+.btn.loading::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 20px;
+    height: 20px;
+    margin: -10px 0 0 -10px;
+    border: 2px solid rgba(10, 14, 26, 0.3);
+    border-top-color: #0a0e1a;
+    border-radius: 50%;
+    animation: spin 0.6s linear infinite;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
 }
 
 .secondary-btn {
-    background: rgba(255, 255, 255, 0.1);
+    background: rgba(255, 255, 255, 0.06);
+    color: var(--text-secondary);
+    border: 1px solid var(--border-color);
 }
 
 .secondary-btn:hover {
-    background: rgba(255, 255, 255, 0.16);
+    background: rgba(255, 255, 255, 0.1);
+    color: var(--text-color);
 }
 
 .danger-btn {
@@ -447,13 +501,14 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 }
 
 .data-btn {
-    background: rgba(59, 130, 246, 0.12);
-    border: 1px solid rgba(59, 130, 246, 0.35);
-    color: #bfdbfe;
+    background: rgba(245, 158, 11, 0.08);
+    border: 1px solid rgba(245, 158, 11, 0.2);
+    color: #fbbf24;
 }
 
 .data-btn:hover {
-    background: rgba(59, 130, 246, 0.22);
+    background: rgba(245, 158, 11, 0.15);
+    border-color: rgba(245, 158, 11, 0.35);
 }
 
 .danger-outline-btn {
@@ -524,8 +579,8 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 }
 
 .tab.active {
-    background: rgba(59, 130, 246, 0.2);
-    color: var(--primary);
+    background: rgba(245, 158, 11, 0.15);
+    color: #fbbf24;
 }
 
 .error-msg {
@@ -596,14 +651,15 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 
 .currency {
     font-size: 1.5rem;
-    color: #94a3b8;
+    color: var(--text-secondary);
     margin-right: 0.25rem;
 }
 
 .amount {
     font-size: 3.5rem;
-    font-weight: 600;
-    color: #10b981;
+    font-weight: 700;
+    font-family: 'JetBrains Mono', 'Fira Code', monospace;
+    color: var(--success);
     line-height: 1;
 }
 
@@ -793,7 +849,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 
 .sort-select:focus {
     border-color: var(--primary);
-    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+    box-shadow: 0 0 0 3px var(--primary-glow);
 }
 
 .sort-select option {
@@ -841,7 +897,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 .stats-header h2 {
     font-size: 1.8rem;
     font-weight: 700;
-    background: linear-gradient(to right, #60a5fa, #a78bfa);
+    background: linear-gradient(135deg, #f59e0b, #fbbf24);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     margin-bottom: 0.3rem;
@@ -909,9 +965,10 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 }
 
 .stats-view-btn.active {
-    color: #fff;
-    border-color: rgba(59, 130, 246, 0.5);
-    background: rgba(59, 130, 246, 0.28);
+    color: #fbbf24;
+    border-color: rgba(245, 158, 11, 0.4);
+    background: rgba(245, 158, 11, 0.15);
+    box-shadow: 0 0 12px rgba(245, 158, 11, 0.1);
 }
 
 .stats-top-row {
@@ -955,15 +1012,17 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 .stat-value-large {
     font-size: 2.6rem;
     font-weight: 700;
-    color: #10b981;
+    font-family: 'JetBrains Mono', 'Fira Code', monospace;
+    color: var(--success);
     line-height: 1;
-    text-shadow: 0 0 20px rgba(16, 185, 129, 0.4);
+    text-shadow: 0 0 24px rgba(16, 185, 129, 0.3);
 }
 
 .stat-value-medium {
     font-size: 2rem;
     font-weight: 700;
-    color: #f8fafc;
+    font-family: 'JetBrains Mono', 'Fira Code', monospace;
+    color: var(--text-color);
     line-height: 1;
 }
 
@@ -1005,6 +1064,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 .badge-num {
     font-size: 1.5rem;
     font-weight: 700;
+    font-family: 'JetBrains Mono', 'Fira Code', monospace;
     color: white;
     line-height: 1;
 }
@@ -1314,22 +1374,21 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
     background: var(--card-bg);
     backdrop-filter: blur(12px);
     border: 1px solid var(--border-color);
-    border-radius: 15px;
-    padding: 1rem 1.5rem;
+    border-radius: 12px;
+    padding: 1rem 1.25rem;
     display: flex;
     justify-content: space-between;
     align-items: center;
     gap: 10px;
-    transition: transform 0.2s, box-shadow 0.2s, background 0.2s;
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+    transition: all 0.2s ease;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
 }
 
 .history-item:hover {
-    transform: translateY(-3px);
-    border-color: rgba(255, 255, 255, 0.3);
-    background: rgba(30, 41, 59, 0.85);
-    /* highlight */
-    box-shadow: 0 12px 20px -5px rgba(0, 0, 0, 0.4), 0 8px 10px -5px rgba(0, 0, 0, 0.2);
+    transform: translateY(-2px);
+    border-color: var(--border-hover);
+    background: rgba(26, 34, 54, 0.9);
+    box-shadow: 0 8px 24px -4px rgba(0, 0, 0, 0.3);
 }
 
 /* Modal */
@@ -1355,9 +1414,10 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
     max-width: 400px;
     padding: 2.5rem 2rem;
     text-align: center;
-    animation: slideUp 0.3s ease-out;
+    animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1);
     max-height: 90vh;
     overflow-y: auto;
+    border: 1px solid rgba(245, 158, 11, 0.1);
 }
 
 .form-modal {
@@ -1534,8 +1594,9 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 
 .history-cost-val {
     font-size: 1.4rem;
-    font-weight: 600;
-    color: #10b981;
+    font-weight: 700;
+    font-family: 'JetBrains Mono', 'Fira Code', monospace;
+    color: var(--success);
 }
 
 .history-cost-val span {
@@ -1873,15 +1934,16 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
     width: 60px;
     height: 60px;
     border-radius: 50%;
-    background: linear-gradient(135deg, var(--primary), var(--secondary));
-    color: white;
+    background: linear-gradient(135deg, #f59e0b, #d97706);
+    color: #0a0e1a;
     font-size: 2rem;
-    font-weight: 300;
+    font-weight: 400;
     border: none;
     cursor: pointer;
-    box-shadow: 0 4px 15px rgba(59, 130, 246, 0.4);
+    box-shadow: 0 4px 20px rgba(245, 158, 11, 0.35);
     display: flex;
     align-items: center;
+    transition: all 0.2s ease;
     justify-content: center;
     transition: transform 0.3s ease, box-shadow 0.3s ease;
     z-index: 99;
@@ -2496,8 +2558,8 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
     color: #64748b;
 }
 [data-theme="light"] .stats-view-btn.active {
-    color: #0f172a;
-    border-bottom-color: #2563eb;
+    color: #92400e;
+    border-bottom-color: #f59e0b;
 }
 [data-theme="light"] .stats-breakdown-item {
     background: rgba(0,0,0,0.03);
@@ -2536,8 +2598,8 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 [data-theme="light"] .info-section h3 { color: #1e293b; }
 [data-theme="light"] .info-section p { color: #475569; }
 
-[data-theme="light"] .fab-btn { background: linear-gradient(135deg, #2563eb, #6366f1) !important; color: #ffffff !important; box-shadow: 0 8px 20px rgba(37, 99, 235, 0.3); text-shadow: 0 1px 2px rgba(0,0,0,0.1); }
-[data-theme="light"] .fab-btn:hover { box-shadow: 0 10px 25px rgba(37, 99, 235, 0.5); transform: translateY(-5px) scale(1.05); }
+[data-theme="light"] .fab-btn { background: linear-gradient(135deg, #f59e0b, #d97706) !important; color: #0a0e1a !important; box-shadow: 0 8px 20px rgba(245, 158, 11, 0.3); }
+[data-theme="light"] .fab-btn:hover { box-shadow: 0 10px 25px rgba(245, 158, 11, 0.45); transform: translateY(-3px); }
 
 [data-theme="light"] .badge-num { color: #1e293b; }
 [data-theme="light"] .badge-label { color: #64748b; }
@@ -2551,4 +2613,4 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 [data-theme="light"] .stats-control-header h2 { color: #1e293b; }
 [data-theme="light"] .stats-view-btn { background: rgba(0,0,0,0.05) !important; color: #475569 !important; border-color: rgba(0,0,0,0.1) !important; }
 [data-theme="light"] .stats-view-btn:hover { background: rgba(0,0,0,0.1) !important; color: #0f172a !important; }
-[data-theme="light"] .stats-view-btn.active { background: rgba(37,99,235,0.15) !important; color: #1d4ed8 !important; border-color: rgba(37,99,235,0.4) !important; }
+[data-theme="light"] .stats-view-btn.active { background: rgba(245,158,11,0.12) !important; color: #92400e !important; border-color: rgba(245,158,11,0.3) !important; }

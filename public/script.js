@@ -316,10 +316,18 @@ document.addEventListener('DOMContentLoaded', () => {
         const username = usernameInput.value.trim();
         const password = passwordInput.value;
 
-        if (isLoginMode) {
-            await login(username, password);
-        } else {
-            await register(username, password);
+        authSubmitBtn.classList.add('loading');
+        authSubmitBtn.disabled = true;
+
+        try {
+            if (isLoginMode) {
+                await login(username, password);
+            } else {
+                await register(username, password);
+            }
+        } finally {
+            authSubmitBtn.classList.remove('loading');
+            authSubmitBtn.disabled = false;
         }
     });
 
@@ -594,6 +602,9 @@ document.addEventListener('DOMContentLoaded', () => {
         });
 
         // Save to backend
+        const submitBtn = costForm.querySelector('button[type="submit"]');
+        submitBtn.classList.add('loading');
+        submitBtn.disabled = true;
         try {
             const res = await fetch('/api/records', {
                 method: 'POST',
@@ -621,6 +632,9 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         } catch (e) {
             console.error('保存失败', e);
+        } finally {
+            submitBtn.classList.remove('loading');
+            submitBtn.disabled = false;
         }
     });
 
@@ -731,6 +745,9 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         const submitUpdate = async (cascadeAction = 'none') => {
+            const submitBtn = statusForm.querySelector('button[type="submit"]');
+            submitBtn.classList.add('loading');
+            submitBtn.disabled = true;
             try {
                 const res = await fetch(`/api/records/${id}`, {
                     method: 'PUT',
@@ -745,7 +762,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 } else {
                     showAppAlert(data.error || '更新失败');
                 }
-            } catch (err) { }
+            } catch (err) { } finally {
+                submitBtn.classList.remove('loading');
+                submitBtn.disabled = false;
+            }
         };
 
         const record = globalRecords.find(r => r.id === parseInt(id));
