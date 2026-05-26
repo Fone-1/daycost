@@ -60,8 +60,8 @@ router.get('/trend', authenticateToken, async (req, res) => {
 
         const now = new Date();
         now.setHours(0, 0, 0, 0);
-        let points = [];
-        let labels = [];
+        const points = [];
+        const labels = [];
         let count = 0;
         let stepDays = 1;
 
@@ -124,7 +124,7 @@ router.get('/trend', authenticateToken, async (req, res) => {
         }
 
         const timeDiff = Math.max(0, endDate.getTime() - purchaseDate.getTime());
-        let daysUsed = Math.floor(timeDiff / (1000 * 3600 * 24));
+        const daysUsed = Math.floor(timeDiff / (1000 * 3600 * 24));
         const actualDaysForCalc = daysUsed + 1;
 
         return finalCost / actualDaysForCalc;
@@ -150,10 +150,10 @@ router.get('/pie', authenticateToken, async (req, res) => {
 
         const sortedForChart = dataToShow.sort((a, b) => b._aggDailyCost - a._aggDailyCost);
 
-        let labels = [];
-        let data = [];
-        let originalIds = [];
-        let hasChildrenArray = [];
+        const labels = [];
+        const data = [];
+        const originalIds = [];
+        const hasChildrenArray = [];
         let otherCost = 0;
 
         sortedForChart.forEach((item, index) => {

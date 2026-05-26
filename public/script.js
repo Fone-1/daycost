@@ -2,7 +2,7 @@
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
         navigator.serviceWorker.register('/sw.js')
-            .then(reg => console.log('ServiceWorker registered'))
+            .then(_reg => console.log('ServiceWorker registered'))
             .catch(err => console.log('ServiceWorker registration failed: ', err));
     });
 }
@@ -10,7 +10,6 @@ if ('serviceWorker' in navigator) {
 document.addEventListener('DOMContentLoaded', () => {
     // --- Tooltip System ---
     const tooltip = document.getElementById('globalTooltip');
-    let tooltipTimeout;
 
     function bindTooltip(el, text) {
         el.addEventListener('mouseenter', (e) => {
@@ -129,7 +128,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // History
-    const historyList = document.getElementById('historyList');
     const filterSelect = document.getElementById('filterSelect');
     const sortSelect = document.getElementById('sortSelect');
     const searchInput = document.getElementById('searchInput');
@@ -143,7 +141,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let chartCurrentParentId = null;
     let clusterizeInstance = null;
     let trashClusterizeInstance = null;
-    let expandedParents = {};
+    const expandedParents = {};
     let globalTrashRecords = [];
     let statsActiveView = 'tag';
     let statsLinkedFilter = null;
@@ -155,8 +153,11 @@ document.addEventListener('DOMContentLoaded', () => {
     let isLoadingRecords = false;
 
     // --- Custom Alert Modal Logic ---
+    const customAlertModal = document.getElementById('customAlertModal');
     const alertIcon = document.getElementById('alertIcon');
     const alertTitle = document.getElementById('alertTitle');
+    const alertMessage = document.getElementById('alertMessage');
+    const alertOkBtn = document.getElementById('alertOkBtn');
 
     window.showAppAlert = function (msg, type = 'error') {
         alertMessage.innerText = msg;
@@ -238,8 +239,6 @@ document.addEventListener('DOMContentLoaded', () => {
     if (chartBackBtn) {
         chartBackBtn.addEventListener('click', () => {
             chartCurrentParentId = null;
-            // Hacky but simple: re-render the history view (which re-renders charts)
-            const event = new Event('submit');
             if (globalRecords.length > 0) {
                 // Re-calculate simply by calling renderChart again
                 renderChart();
@@ -651,7 +650,7 @@ document.addEventListener('DOMContentLoaded', () => {
         endDate.setHours(0, 0, 0, 0);
 
         const timeDiff = Math.max(0, endDate.getTime() - purchaseDate.getTime());
-        let daysUsed = Math.floor(timeDiff / (1000 * 3600 * 24));
+        const daysUsed = Math.floor(timeDiff / (1000 * 3600 * 24));
         const actualDaysForCalc = daysUsed + 1;
 
         let finalCost = record.price;
@@ -1211,7 +1210,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
 
         // 6. Rendering (Virtual List via Clusterize)
-        let virtualRows = [];
+        const virtualRows = [];
 
         if (topLevelRecords.length === 0) {
             virtualRows.push('<div class="clusterize-no-data" style="text-align:center; color:#94a3b8; padding: 20px;">没有符合条件的记录</div>');
@@ -1282,7 +1281,7 @@ document.addEventListener('DOMContentLoaded', () => {
             queryParams.append('parent_id', chartCurrentParentId);
         }
         
-        let url = `/api/stats/pie?${queryParams.toString()}`;
+        const url = `/api/stats/pie?${queryParams.toString()}`;
 
         try {
             const res = await fetch(url, { headers: getHeaders() });
@@ -1326,7 +1325,7 @@ document.addEventListener('DOMContentLoaded', () => {
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
-                onClick: (event, elements, chart) => {
+                onClick: (_event, elements, _chart) => {
                     if (elements.length > 0) {
                         const idx = elements[0].index;
                         const clickedId = dataObj.originalIds[idx];
@@ -1449,9 +1448,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // --- Export / Import Logic ---
-    const exportCsvBtn = document.getElementById('exportCsvBtn');
-    const backupExportBtn = document.getElementById('backupExportBtn');
-    const backupImportBtn = document.getElementById('backupImportBtn');
     const importFileInput = document.getElementById('importFileInput');
     const importChoiceModal = document.getElementById('importChoiceModal');
     let tempDataToImport = null;
@@ -2039,7 +2035,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 
-    window.handleSwipeEnd = function(e) {
+    window.handleSwipeEnd = function(_e) {
         if(!swipeWrapper || window.innerWidth > 799) return;
         swipeWrapper.style.transition = 'transform 0.3s cubic-bezier(0.1, 0.7, 0.1, 1)';
         
@@ -2076,7 +2072,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- TOTP ---
     let totpRefreshInterval = null;
     let totpCurrentGroup = null; // null = all
-    let totpPendingGroups = []; // groups created by user but not yet in DB
+    const totpPendingGroups = []; // groups created by user but not yet in DB
 
     // Load groups into sidebar
     async function loadTOTPGroups() {
@@ -2409,9 +2405,11 @@ document.addEventListener('DOMContentLoaded', () => {
     if (totpAddKeyBtn) totpAddKeyBtn.addEventListener('click', openAddKeyModal);
     if (totpAddKeyModalClose) totpAddKeyModalClose.addEventListener('click', closeAddKeyModal);
     if (totpAddKeyCancel) totpAddKeyCancel.addEventListener('click', closeAddKeyModal);
-    if (totpAddKeyModal) totpAddKeyModal.addEventListener('click', (e) => {
-        if (e.target === totpAddKeyModal) closeAddKeyModal();
-    });
+    if (totpAddKeyModal) {
+        totpAddKeyModal.addEventListener('click', (e) => {
+            if (e.target === totpAddKeyModal) { closeAddKeyModal(); }
+        });
+    }
 
     // TOTP add form
     const totpAddForm = document.getElementById('totpAddForm');
@@ -2784,7 +2782,7 @@ window.addEventListener('themechanged', () => {
         }
 
         // Re-render all existing charts
-        for (let id in Chart.instances) {
+        for (const id in Chart.instances) {
             Chart.instances[id].update();
         }
     }

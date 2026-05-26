@@ -21,6 +21,8 @@
     "xss": "^1.0.15"
   },
   "devDependencies": {
+    "eslint": "^8.57.1",
+    "eslint-config-recommended": "^4.1.0",
     "node-gyp": "^12.3.0"
   }
 }

@@ -77,14 +77,14 @@ function getFilteredTreeRecords(userId, queryParams, db) {
                 return true;
             };
 
-            let matchedTopLevelIds = new Set();
+            const matchedTopLevelIds = new Set();
             Object.values(topLevelMap).forEach(parent => {
                 const family = [parent, ...(childrenMap[parent.id] || [])];
                 let matches = false;
                 for (const member of family) {
-                    let matchSearch = !searchQuery || member.item_name.toLowerCase().includes(searchQuery) || (member.tags && member.tags.toLowerCase().includes(searchQuery));
-                    let matchStatus = !statusFilter || member.status === statusFilter;
-                    let matchStats = matchesStatsFilter(member, parent);
+                    const matchSearch = !searchQuery || member.item_name.toLowerCase().includes(searchQuery) || (member.tags && member.tags.toLowerCase().includes(searchQuery));
+                    const matchStatus = !statusFilter || member.status === statusFilter;
+                    const matchStats = matchesStatsFilter(member, parent);
                     if (matchSearch && matchStatus && matchStats) {
                         matches = true;
                         break;

@@ -1,9 +1,9 @@
 const sqlite3 = require('sqlite3').verbose();
 const { DB_PATH } = require('./env');
 
-const db = new sqlite3.Database(DB_PATH, (err) => {
-    if (err) {
-        console.error('Error opening database', err.message);
+const db = new sqlite3.Database(DB_PATH, (_err) => {
+    if (_err) {
+        console.error('Error opening database', _err.message);
     } else {
         console.log('Connected to SQLite database.');
 
@@ -30,21 +30,21 @@ const db = new sqlite3.Database(DB_PATH, (err) => {
             )`);
 
             // Safe Migrations
-            db.run("ALTER TABLE records ADD COLUMN status TEXT DEFAULT 'active'", (err) => { });
-            db.run("ALTER TABLE records ADD COLUMN end_date TEXT", (err) => { });
-            db.run("ALTER TABLE records ADD COLUMN resale_price REAL DEFAULT 0", (err) => { });
-            db.run("ALTER TABLE records ADD COLUMN parent_id INTEGER DEFAULT NULL", (err) => { });
-            db.run("ALTER TABLE records ADD COLUMN is_deleted INTEGER DEFAULT 0", (err) => { });
-            db.run("ALTER TABLE records ADD COLUMN deleted_at DATETIME DEFAULT NULL", (err) => { });
+            db.run("ALTER TABLE records ADD COLUMN status TEXT DEFAULT 'active'", (_err) => { });
+            db.run("ALTER TABLE records ADD COLUMN end_date TEXT", (_err) => { });
+            db.run("ALTER TABLE records ADD COLUMN resale_price REAL DEFAULT 0", (_err) => { });
+            db.run("ALTER TABLE records ADD COLUMN parent_id INTEGER DEFAULT NULL", (_err) => { });
+            db.run("ALTER TABLE records ADD COLUMN is_deleted INTEGER DEFAULT 0", (_err) => { });
+            db.run("ALTER TABLE records ADD COLUMN deleted_at DATETIME DEFAULT NULL", (_err) => { });
 
             // User role migration
-            db.run("ALTER TABLE users ADD COLUMN role TEXT DEFAULT 'user'", (err) => { });
+            db.run("ALTER TABLE users ADD COLUMN role TEXT DEFAULT 'user'", (_err) => { });
             // Tags migration
-            db.run("ALTER TABLE records ADD COLUMN tags TEXT DEFAULT ''", (err) => { });
+            db.run("ALTER TABLE records ADD COLUMN tags TEXT DEFAULT ''", (_err) => { });
             // Depreciation migration
-            db.run("ALTER TABLE records ADD COLUMN depreciation_method TEXT DEFAULT 'straight_line'", (err) => { });
-            db.run("ALTER TABLE records ADD COLUMN expected_lifespan INTEGER DEFAULT 1095", (err) => { });
-            db.run("ALTER TABLE records ADD COLUMN expected_salvage REAL DEFAULT 0", (err) => { });
+            db.run("ALTER TABLE records ADD COLUMN depreciation_method TEXT DEFAULT 'straight_line'", (_err) => { });
+            db.run("ALTER TABLE records ADD COLUMN expected_lifespan INTEGER DEFAULT 1095", (_err) => { });
+            db.run("ALTER TABLE records ADD COLUMN expected_salvage REAL DEFAULT 0", (_err) => { });
 
             // --- PERFORMANCE: Create SQL View for Computed Columns ---
             db.run(`CREATE VIEW IF NOT EXISTS v_records_computed AS
@@ -131,7 +131,7 @@ FROM records;`);
                 FOREIGN KEY (user_id) REFERENCES users(id)
             )`);
             // TOTP group migration
-            db.run("ALTER TABLE totp_entries ADD COLUMN group_name TEXT DEFAULT '默认分组'", (err) => { });
+            db.run("ALTER TABLE totp_entries ADD COLUMN group_name TEXT DEFAULT '默认分组'", (_err) => { });
         });
     }
 });
@@ -139,8 +139,8 @@ FROM records;`);
 // --- BACKGROUND TASK: Auto-purge Recycle Bin entries older than 30 days ---
 setInterval(() => {
     console.log('Running background auto-purge task...');
-    db.run(`DELETE FROM records WHERE is_deleted = 1 AND deleted_at < datetime('now', '-30 days')`, (err) => {
-        if (err) console.error('Background auto-purge failed', err);
+    db.run(`DELETE FROM records WHERE is_deleted = 1 AND deleted_at < datetime('now', '-30 days')`, (_err) => {
+        if (_err) console.error('Background auto-purge failed', _err);
         else console.log('Background auto-purge completed.');
     });
 }, 3600000); // Once every hour

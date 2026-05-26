@@ -128,7 +128,7 @@ router.post('/', authenticateToken, (req, res) => {
     const normalizedLifespan = Number(expected_lifespan || 1095);
     const normalizedSalvage = Number(expected_salvage || 0);
 
-    if (!item_name || price == null || !purchase_date) {
+    if (!item_name || price === undefined || price === null || !purchase_date) {
         return res.status(400).json({ error: '请填写物品名称、价格和购买日期。' });
     }
     if (!['active', 'broken', 'sold'].includes(normalizedStatus)) {
@@ -184,7 +184,7 @@ router.put('/:id', authenticateToken, (req, res) => {
     const normalizedSalvage = Number(expected_salvage || 0);
     const normalizedParentId = parent_id ? Number(parent_id) : null;
 
-    if (!item_name || price == null || !purchase_date) {
+    if (!item_name || price === undefined || price === null || !purchase_date) {
         return res.status(400).json({ error: '请填写物品名称、价格和购买日期。' });
     }
     if (!['active', 'broken', 'sold'].includes(status)) {

@@ -156,7 +156,7 @@ router.post('/import', authenticateToken, (req, res) => {
 
     let imported = 0;
     let skipped = 0;
-    let errors = [];
+    const errors = [];
 
     const stmt = db.prepare('INSERT INTO totp_entries (user_id, label, secret_enc, iv, auth_tag, issuer, group_name) VALUES (?, ?, ?, ?, ?, ?, ?)');
 

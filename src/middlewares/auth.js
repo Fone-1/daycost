@@ -5,7 +5,7 @@ const authenticateToken = (req, res, next) => {
     const authHeader = req.headers['authorization'];
     const token = authHeader && authHeader.split(' ')[1];
 
-    if (token == null) return res.status(401).json({ error: '请先登录' });
+    if (!token) return res.status(401).json({ error: '请先登录' });
 
     jwt.verify(token, JWT_SECRET, (err, user) => {
         if (err) return res.status(403).json({ error: '登录态已过期，请重新登录' });
