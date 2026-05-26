@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DayCost - 管理面板</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+    <script src="/chart.min.js"></script>
+    <link rel="stylesheet" href="admin.css">
+</head>
+<body>
+    <div id="adminApp" class="admin-app hidden">
+        <!-- Top Bar -->
+        <header class="admin-topbar glass">
+            <a href="/" class="admin-back">← 返回主页</a>
+            <h1 class="admin-title">DayCost 管理面板</h1>
+            <button id="adminLogoutBtn" class="admin-logout">退出</button>
+        </header>
+
+        <div class="admin-body">
+            <!-- Sidebar -->
+            <aside class="admin-sidebar glass">
+                <button class="admin-nav-item active" data-section="overview">
+                    <span class="admin-nav-icon">📊</span>
+                    <span>概览</span>
+                </button>
+                <button class="admin-nav-item" data-section="users">
+                    <span class="admin-nav-icon">👥</span>
+                    <span>用户管理</span>
+                </button>
+                <button class="admin-nav-item" data-section="logs">
+                    <span class="admin-nav-icon">📋</span>
+                    <span>操作日志</span>
+                </button>
+            </aside>
+
+            <!-- Content -->
+            <main class="admin-content">
+                <!-- Overview Section -->
+                <section id="section-overview" class="admin-section active">
+                    <div class="overview-header">
+                        <h2>系统概览</h2>
+                        <span class="overview-timestamp" id="overviewTimestamp"></span>
+                    </div>
+                    <div class="instrument-grid">
+                        <div class="instrument-card" data-accent="amber">
+                            <div class="instrument-glow"></div>
+                            <div class="instrument-head">
+                                <span class="instrument-icon">◈</span>
+                                <span class="instrument-label">总用户数</span>
+                            </div>
+                            <div class="instrument-readout" id="statTotalUsers">0</div>
+                            <div class="instrument-bar"><div class="instrument-bar-fill"></div></div>
+                        </div>
+                        <div class="instrument-card" data-accent="green">
+                            <div class="instrument-glow"></div>
+                            <div class="instrument-head">
+                                <span class="instrument-icon">◉</span>
+                                <span class="instrument-label">活跃用户</span>
+                            </div>
+                            <div class="instrument-readout" id="statActiveUsers">0</div>
+                            <div class="instrument-bar"><div class="instrument-bar-fill"></div></div>
+                        </div>
+                        <div class="instrument-card" data-accent="blue">
+                            <div class="instrument-glow"></div>
+                            <div class="instrument-head">
+                                <span class="instrument-icon">◆</span>
+                                <span class="instrument-label">总记录数</span>
+                            </div>
+                            <div class="instrument-readout" id="statTotalRecords">0</div>
+                            <div class="instrument-bar"><div class="instrument-bar-fill"></div></div>
+                        </div>
+                        <div class="instrument-card" data-accent="slate">
+                            <div class="instrument-glow"></div>
+                            <div class="instrument-head">
+                                <span class="instrument-icon">◎</span>
+                                <span class="instrument-label">运行时间</span>
+                            </div>
+                            <div class="instrument-readout mono" id="statUptime">--:--:--</div>
+                            <div class="instrument-bar"><div class="instrument-bar-fill"></div></div>
+                        </div>
+                    </div>
+                    <div class="overview-row">
+                        <div class="waveform-card glass">
+                            <div class="waveform-header">
+                                <span class="waveform-title">注册趋势</span>
+                                <span class="waveform-subtitle">近 30 天</span>
+                            </div>
+                            <div class="waveform-body">
+                                <canvas id="trendChart"></canvas>
+                            </div>
+                        </div>
+                        <div class="terminal-card glass">
+                            <div class="terminal-header">
+                                <span class="terminal-dot red"></span>
+                                <span class="terminal-dot amber"></span>
+                                <span class="terminal-dot green"></span>
+                                <span class="terminal-title">system.info</span>
+                            </div>
+                            <div class="terminal-body">
+                                <div class="terminal-line"><span class="terminal-prompt">$</span> <span class="terminal-key">version</span><span class="terminal-val" id="sysVersion">-</span></div>
+                                <div class="terminal-line"><span class="terminal-prompt">$</span> <span class="terminal-key">runtime</span><span class="terminal-val" id="sysNode">-</span></div>
+                                <div class="terminal-line"><span class="terminal-prompt">$</span> <span class="terminal-key">db_size</span><span class="terminal-val" id="sysDbSize">-</span></div>
+                                <div class="terminal-line"><span class="terminal-prompt">$</span> <span class="terminal-key">env</span><span class="terminal-val" id="sysEnv">-</span></div>
+                                <div class="terminal-line"><span class="terminal-prompt">$</span> <span class="terminal-key">uptime</span><span class="terminal-val" id="sysUptime">-</span></div>
+                                <div class="terminal-cursor"></div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Users Section -->
+                <section id="section-users" class="admin-section">
+                    <div class="section-header">
+                        <h2>用户管理</h2>
+                        <span class="section-count" id="userCount"></span>
+                    </div>
+                    <div class="data-toolbar">
+                        <div class="cmd-input-wrap">
+                            <span class="cmd-input-prompt">❯</span>
+                            <input type="text" id="userSearchInput" class="cmd-input" placeholder="filter users..." autocomplete="off" spellcheck="false">
+                        </div>
+                        <button id="adminRefreshUsersBtn" class="tool-btn" title="刷新">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
+                        </button>
+                    </div>
+                    <div class="manifest-panel glass">
+                        <div class="manifest-header">
+                            <div class="manifest-row manifest-thead">
+                                <span class="manifest-cell col-id">ID</span>
+                                <span class="manifest-cell col-user">用户名</span>
+                                <span class="manifest-cell col-role">角色</span>
+                                <span class="manifest-cell col-status">状态</span>
+                                <span class="manifest-cell col-date">注册时间</span>
+                                <span class="manifest-cell col-items">物品</span>
+                                <span class="manifest-cell col-spent">总投入</span>
+                                <span class="manifest-cell col-actions">操作</span>
+                            </div>
+                        </div>
+                        <div class="manifest-body" id="adminUsersList"></div>
+                    </div>
+                </section>
+
+                <!-- Logs Section -->
+                <section id="section-logs" class="admin-section">
+                    <div class="section-header">
+                        <h2>操作日志</h2>
+                        <span class="section-count" id="logCount"></span>
+                    </div>
+                    <div class="data-toolbar">
+                        <div class="cmd-select-wrap">
+                            <select id="logActionFilter" class="cmd-select">
+                                <option value="">全部操作</option>
+                                <option value="login">登录</option>
+                                <option value="record_create">新增记录</option>
+                                <option value="record_update">修改记录</option>
+                                <option value="record_delete">删除记录</option>
+                                <option value="admin_reset_pwd">重置密码</option>
+                                <option value="admin_disable">禁用账号</option>
+                                <option value="admin_enable">启用账号</option>
+                                <option value="admin_role_change">角色变更</option>
+                                <option value="admin_delete_user">删除用户</option>
+                            </select>
+                        </div>
+                        <div class="cmd-input-wrap">
+                            <span class="cmd-input-prompt">❯</span>
+                            <input type="text" id="logUserSearch" class="cmd-input" placeholder="filter user..." autocomplete="off" spellcheck="false">
+                        </div>
+                        <button id="adminRefreshLogsBtn" class="tool-btn" title="刷新">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
+                        </button>
+                    </div>
+                    <div class="manifest-panel glass">
+                        <div class="manifest-header">
+                            <div class="manifest-row manifest-thead">
+                                <span class="manifest-cell col-time">时间</span>
+                                <span class="manifest-cell col-log-user">用户</span>
+                                <span class="manifest-cell col-action">操作</span>
+                                <span class="manifest-cell col-detail">详情</span>
+                                <span class="manifest-cell col-ip">IP</span>
+                            </div>
+                        </div>
+                        <div class="manifest-body" id="adminLogsList"></div>
+                    </div>
+                    <div class="transport-bar">
+                        <button id="logPrevBtn" class="transport-btn" disabled title="上一页">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
+                        </button>
+                        <span id="logPageInfo" class="transport-info">— / —</span>
+                        <button id="logNextBtn" class="transport-btn" disabled title="下一页">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
+                        </button>
+                    </div>
+                </section>
+            </main>
+        </div>
+    </div>
+
+    <!-- Temp Password Modal -->
+    <div id="tempPwdModal" class="modal-overlay hidden">
+        <div class="modal-content glass small-modal">
+            <h2>密码已重置</h2>
+            <p class="modal-message">请将以下临时密码告知用户：</p>
+            <div class="temp-pwd-display">
+                <code id="tempPwdValue"></code>
+            </div>
+            <p class="modal-message" style="font-size:0.8rem;color:#94a3b8">用户 <strong id="tempPwdUsername"></strong> 需使用此密码登录后修改。</p>
+            <button id="tempPwdCloseBtn" class="admin-btn">确定</button>
+        </div>
+    </div>
+
+    <!-- Global Action Menu -->
+    <div id="globalActionMenu" class="action-menu">
+        <button class="action-menu-item" data-action="reset-pwd">重置密码</button>
+        <button class="action-menu-item" data-action="toggle-disable">禁用账号</button>
+        <button class="action-menu-item" data-action="toggle-role">提升为管理员</button>
+        <button class="action-menu-item danger" data-action="delete-user">删除用户</button>
+    </div>
+
+    <!-- Auth Gate (shown before admin panel loads) -->
+    <div id="authGate" class="auth-gate">
+        <div class="auth-gate-text">验证权限中...</div>
+    </div>
+
+    <script src="admin.js"></script>
+</body>
+</html>

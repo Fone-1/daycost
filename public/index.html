@@ -69,7 +69,6 @@
                 <button class="nav-btn" data-target="pane-trash">回收站</button>
                 <button class="nav-btn" data-target="pane-totp">密钥</button>
                 <button class="nav-btn" data-target="pane-settings">设置</button>
-                <button class="nav-btn hidden admin-nav-btn" id="navAdminBtn" data-target="pane-admin">审计</button>
                 <div class="nav-indicator"></div>
             </div>
         </nav>
@@ -408,36 +407,6 @@
             <div id="trashListScroll" class="history-list clusterize-scroll">
                 <div id="trashListContent" class="clusterize-content"></div>
             </div>
-        </div>
-
-        <div id="pane-admin" class="spa-pane hidden">
-            <header>
-                <h1>审计中心</h1>
-                <p>查看注册用户和全局账目概况。</p>
-            </header>
-
-            <section class="card glass">
-                <h3 class="section-title-row">
-                    注册用户
-                    <button class="btn-small" id="adminRefreshBtn">刷新</button>
-                </h3>
-                <div class="table-scroll">
-                    <table class="admin-table">
-                        <thead>
-                            <tr>
-                                <th>ID</th>
-                                <th>用户名</th>
-                                <th>角色</th>
-                                <th>注册时间</th>
-                                <th>物品数</th>
-                                <th>活跃投入</th>
-                                <th class="align-right">操作</th>
-                            </tr>
-                        </thead>
-                        <tbody id="adminUsersList"></tbody>
-                    </table>
-                </div>
-            </section>
         </div>
     </div>
 

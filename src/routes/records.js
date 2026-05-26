@@ -2,6 +2,7 @@ const express = require('express');
 const db = require('../config/db');
 const { authenticateToken } = require('../middlewares/auth');
 const { getFilteredTreeRecords } = require('../utils/treeHelper');
+const { log, getClientIp } = require('../utils/auditLog');
 
 const router = express.Router();
 
@@ -79,6 +80,7 @@ router.delete('/:id', authenticateToken, (req, res) => {
         db.run(`UPDATE records SET is_deleted = 1, deleted_at = CURRENT_TIMESTAMP WHERE id = ? AND user_id = ?`, [recordId, req.user.id], function (err) {
             if (err) return res.status(500).json({ error: '移入废纸篓失败' });
             if (this.changes === 0) return res.status(404).json({ error: '记录不存在或无权限操作' });
+            log(req.user.id, req.user.username, 'record_delete', `记录ID: ${recordId}`, getClientIp(req));
             res.json({ message: '记录已移动到废纸篓，可在30天内找回' });
         });
     });
@@ -159,6 +161,7 @@ router.post('/', authenticateToken, (req, res) => {
             [req.user.id, item_name, normalizedPrice, purchase_date, normalizedStatus, end_date || null, normalizedResale, parent_id || null, tags || '', depreciation_method || 'straight_line', normalizedLifespan, normalizedSalvage],
             function (err) {
                 if (err) return res.status(500).json({ error: '添加记录失败。' });
+                log(req.user.id, req.user.username, 'record_create', `"${item_name}" ¥${normalizedPrice}`, getClientIp(req));
                 res.json({ message: '记录已添加。', id: this.lastID });
             }
         );
@@ -237,6 +240,7 @@ router.put('/:id', authenticateToken, (req, res) => {
                                 db.run('ROLLBACK;');
                                 return res.status(500).json({ error: '提交更新失败。' });
                             }
+                            log(req.user.id, req.user.username, 'record_update', `"${item_name}" 记录ID: ${recordId}`, getClientIp(req));
                             res.json({ message: '记录已更新。' });
                         });
                     };

@@ -60,16 +60,21 @@ router.post('/register', authLimiter, async (req, res) => {
 // Login
 router.post('/login', authLimiter, (req, res) => {
     const { username, password } = req.body;
+    const { log, getClientIp } = require('../utils/auditLog');
 
     db.get(`SELECT * FROM users WHERE username = ?`, [username], async (err, user) => {
         if (err) return res.status(500).json({ error: '服务器错误' });
         if (!user) return res.status(400).json({ error: '用户不存在或密码错误' });
 
+        if (user.is_disabled) {
+            return res.status(403).json({ error: '账号已被禁用，请联系管理员' });
+        }
+
         try {
             if (await bcrypt.compare(password, user.password_hash)) {
-                // Ensure legacy users without a role fall back to 'user' visually
                 const userRole = user.role || 'user';
                 const token = jwt.sign({ id: user.id, username: user.username, role: userRole }, JWT_SECRET, { expiresIn: '7d' });
+                log(user.id, user.username, 'login', '', getClientIp(req));
                 res.json({ token, username: user.username, role: userRole });
             } else {
                 res.status(400).json({ error: '用户不存在或密码错误' });

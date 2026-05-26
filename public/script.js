@@ -357,9 +357,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function checkAuth() {
         const token = localStorage.getItem('daycost_token');
         const username = localStorage.getItem('daycost_username');
-        const role = localStorage.getItem('daycost_role');
         const globalStatsBox = document.getElementById('globalStatsBox');
-        const navAdminBtn = document.getElementById('navAdminBtn');
 
         if (token && username) {
             authSection.classList.add('hidden');
@@ -368,18 +366,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
             // Load profile & settings
             if (typeof window.initSettings === 'function') window.initSettings();
-
-            if (navAdminBtn) {
-                if (role === 'admin') {
-                    navAdminBtn.classList.remove('hidden');
-                } else {
-                    navAdminBtn.classList.add('hidden');
-                    // Safety UI check: if they are on the admin pane but not admin, kick them home
-                    if (document.getElementById('pane-admin') && !document.getElementById('pane-admin').classList.contains('hidden')) {
-                        document.querySelector('[data-target="pane-home"]').click();
-                    }
-                }
-            }
 
             loadHistory();
             loadStats();
@@ -1086,10 +1072,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const depInfoBtn2 = document.getElementById('depreciationInfoBtn2');
     if (depInfoBtn1 && depreciationInfoModal) depInfoBtn1.addEventListener('click', () => depreciationInfoModal.classList.remove('hidden'));
     if (depInfoBtn2 && depreciationInfoModal) depInfoBtn2.addEventListener('click', () => depreciationInfoModal.classList.remove('hidden'));
-
-    // Admin refresh button
-    const adminRefreshBtn = document.getElementById('adminRefreshBtn');
-    if (adminRefreshBtn) adminRefreshBtn.addEventListener('click', () => { if (typeof loadAdminUsers === 'function') loadAdminUsers(); });
 
     // Event delegation for buttons inside Clusterize virtual scroll
     // (Clusterize replaces DOM via innerHTML, so inline onclick handlers may not bind reliably)
@@ -1956,66 +1938,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }, '永久删除');
     };
 
-    window.loadAdminUsers = async function() {
-        const tbody = document.getElementById('adminUsersList');
-        if (!tbody) return;
-
-        tbody.innerHTML = '<tr><td colspan="7" class="empty-state">数据加载中...</td></tr>';
-
-        try {
-            const res = await fetch('/api/admin/users', { headers: getHeaders() });
-            const data = await res.json();
-            if (!res.ok) throw new Error(data.error || '获取用户列表失败');
-
-            if (!data.data || data.data.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="7" class="empty-state">暂无用户数据</td></tr>';
-                return;
-            }
-
-            tbody.innerHTML = '';
-            data.data.forEach(u => {
-                const tr = document.createElement('tr');
-                const roleBadge = u.role === 'admin'
-                    ? '<span class="status-badge bg-red">管理员</span>'
-                    : '<span class="status-badge bg-blue">普通用户</span>';
-                const delBtn = u.role === 'admin'
-                    ? '<span class="muted">不可删除</span>'
-                    : `<button onclick="deleteAdminUser(${u.id}, '${escapeHtml(u.username)}')" class="btn-small">删除用户</button>`;
-
-                tr.innerHTML = `
-                    <td>#${u.id}</td>
-                    <td>${escapeHtml(u.username)}</td>
-                    <td>${roleBadge}</td>
-                    <td>${new Date(u.created_at).toLocaleDateString()}</td>
-                    <td>${u.total_items || 0} 件</td>
-                    <td>${formatCurrency(u.total_spent || 0)}</td>
-                    <td class="align-right">${delBtn}</td>
-                `;
-                tbody.appendChild(tr);
-            });
-        } catch (err) {
-            tbody.innerHTML = `<tr><td colspan="7" class="empty-state" style="color:#ef4444;">${escapeHtml(err.message)}</td></tr>`;
-        }
-    };
-
-    window.deleteAdminUser = function(id, username) {
-        showAppConfirm('删除用户？', `确定要删除用户「${username}」及其所有记录吗？此操作无法撤销。`, async () => {
-            try {
-                const res = await fetch(`/api/admin/user/${id}`, {
-                    method: 'DELETE',
-                    headers: getHeaders()
-                });
-                const data = await res.json();
-                if (!res.ok) throw new Error(data.error || '删除用户失败');
-
-                showAppAlert(data.message || '用户已删除', 'success');
-                loadAdminUsers();
-            } catch (err) {
-                showAppAlert(err.message || '删除用户失败');
-            }
-        }, '确认删除');
-    };
-
     // --- Mobile Swipe-to-Reveal Logic ---
     let touchStartX = 0;
     let swipeWrapper = null;
@@ -2075,13 +1997,9 @@ document.addEventListener('DOMContentLoaded', () => {
         swipeWrapper = null;
     };
     
-    // Bind the loadAdminUsers to the nav tap if that pane is opened
+    // Load TOTP codes when switching to TOTP tab
     document.querySelectorAll('.nav-btn').forEach(btn => {
         btn.addEventListener('click', () => {
-            if (btn.getAttribute('data-target') === 'pane-admin') {
-                loadAdminUsers();
-            }
-            // Load TOTP codes when switching to TOTP tab
             if (btn.getAttribute('data-target') === 'pane-totp') {
                 loadTOTPGroups();
                 loadTOTPCodes();

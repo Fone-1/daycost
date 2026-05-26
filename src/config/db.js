@@ -137,6 +137,21 @@ FROM records;`);
             )`);
             // TOTP group migration
             db.run("ALTER TABLE totp_entries ADD COLUMN group_name TEXT DEFAULT '默认分组'", (_err) => { });
+
+            // Admin: disable account migration
+            db.run("ALTER TABLE users ADD COLUMN is_disabled INTEGER DEFAULT 0", (_err) => { });
+
+            // Admin: audit logs table
+            db.run(`CREATE TABLE IF NOT EXISTS audit_logs (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER,
+                username TEXT,
+                action TEXT NOT NULL,
+                detail TEXT DEFAULT '',
+                ip TEXT DEFAULT '',
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            )`);
+            db.run("CREATE INDEX IF NOT EXISTS idx_audit_logs_time ON audit_logs(created_at DESC)");
         });
     }
 });
@@ -149,5 +164,12 @@ setInterval(() => {
         else console.log('Background auto-purge completed.');
     });
 }, 3600000); // Once every hour
+
+// --- BACKGROUND TASK: Auto-purge Audit Logs older than 90 days ---
+setInterval(() => {
+    db.run(`DELETE FROM audit_logs WHERE created_at < datetime('now', '-90 days')`, (_err) => {
+        if (_err) console.error('Audit log cleanup failed', _err);
+    });
+}, 3600000);
 
 module.exports = db;

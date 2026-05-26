@@ -11,7 +11,6 @@
     "showAppAlert": "readonly",
     "showAppConfirm": "readonly",
     "showAppChoice": "readonly",
-    "loadAdminUsers": "readonly",
     "toggleChildren": "readonly",
     "openStatusModal": "readonly",
     "deleteRecord": "readonly",
