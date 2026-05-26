@@ -254,6 +254,22 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- SPA Routing Logic ---
     const navBtns = document.querySelectorAll('.nav-btn');
     const panes = document.querySelectorAll('.spa-pane');
+    const navIndicator = document.querySelector('.nav-indicator');
+
+    function moveIndicator(activeBtn) {
+        if (!navIndicator || !activeBtn) return;
+        const group = activeBtn.parentElement;
+        const groupRect = group.getBoundingClientRect();
+        const btnRect = activeBtn.getBoundingClientRect();
+        navIndicator.style.left = (btnRect.left - groupRect.left) + 'px';
+        navIndicator.style.width = btnRect.width + 'px';
+    }
+
+    // Initialize indicator position
+    const initialActive = document.querySelector('.nav-btn.active');
+    if (initialActive) {
+        requestAnimationFrame(() => moveIndicator(initialActive));
+    }
 
     navBtns.forEach(btn => {
         btn.addEventListener('click', () => {
@@ -261,6 +277,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             navBtns.forEach(b => b.classList.remove('active'));
             btn.classList.add('active');
+            moveIndicator(btn);
 
             panes.forEach(pane => {
                 if (pane.id === targetId) {
@@ -2778,7 +2795,7 @@ window.addEventListener('themechanged', () => {
         const isLight = document.documentElement.getAttribute('data-theme') === 'light';
         const textColor = isLight ? '#64748b' : '#cbd5e1';
         const gridColor = isLight ? 'rgba(0,0,0,0.1)' : 'rgba(255,255,255,0.1)';
-        
+
         Chart.defaults.color = textColor;
         if (Chart.defaults.scale && Chart.defaults.scale.grid) {
             Chart.defaults.scale.grid.color = gridColor;
@@ -2788,5 +2805,18 @@ window.addEventListener('themechanged', () => {
         for (const id in Chart.instances) {
             Chart.instances[id].update();
         }
+    }
+});
+
+// --- Nav Indicator Reposition on Resize ---
+window.addEventListener('resize', () => {
+    const activeBtn = document.querySelector('.nav-btn.active');
+    const indicator = document.querySelector('.nav-indicator');
+    if (activeBtn && indicator) {
+        const group = activeBtn.parentElement;
+        const groupRect = group.getBoundingClientRect();
+        const btnRect = activeBtn.getBoundingClientRect();
+        indicator.style.left = (btnRect.left - groupRect.left) + 'px';
+        indicator.style.width = btnRect.width + 'px';
     }
 });

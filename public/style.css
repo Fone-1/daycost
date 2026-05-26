@@ -69,44 +69,55 @@ body {
 
 .nav-btn-group {
     display: flex;
-    gap: 0.5rem;
+    gap: 0.25rem;
     flex: 1;
     justify-content: center;
-    /* Desktop: offset center to account for brand width */
-    padding-left: 80px;
+    position: relative;
 }
 
 .nav-brand {
-    font-size: 1.3rem;
+    font-size: 1.15rem;
     font-weight: 700;
     background: linear-gradient(135deg, #f59e0b, #fbbf24);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     white-space: nowrap;
     flex-shrink: 0;
+    letter-spacing: -0.02em;
+    margin-right: 1rem;
 }
 
 .nav-btn {
-    padding: 0.45rem 0.9rem;
+    padding: 0.5rem 1rem;
     border-radius: 8px;
     border: none;
     background: transparent;
-    color: #94a3b8;
+    color: #64748b;
     cursor: pointer;
-    transition: 0.3s;
-    font-weight: 600;
+    transition: color 0.25s ease;
+    font-weight: 500;
     font-size: 0.85rem;
     white-space: nowrap;
+    position: relative;
 }
 
 .nav-btn:hover {
-    background: rgba(255, 255, 255, 0.05);
+    color: #94a3b8;
 }
 
 .nav-btn.active {
-    background: rgba(245, 158, 11, 0.12);
     color: #fbbf24;
-    box-shadow: 0 0 12px rgba(245, 158, 11, 0.1);
+}
+
+.nav-indicator {
+    position: absolute;
+    bottom: -2px;
+    height: 2px;
+    background: linear-gradient(90deg, #f59e0b, #fbbf24);
+    border-radius: 2px;
+    transition: left 0.3s cubic-bezier(0.4, 0, 0.2, 1), width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 0 8px rgba(245, 158, 11, 0.4);
+    pointer-events: none;
 }
 
 .btn-small {
@@ -187,12 +198,12 @@ body {
     margin-bottom: 1.5rem;
     display: flex;
     align-items: center;
-    padding: 0.7rem 1.2rem;
+    padding: 0.6rem 1.2rem;
     border-radius: 16px;
+    overflow: hidden;
 }
 
 .admin-nav-btn {
-    background: rgba(239, 68, 68, 0.15);
     color: #fca5a5;
 }
 
@@ -203,7 +214,6 @@ body {
 /* Mobile nav font tweak */
 @media (max-width: 799px) {
     .nav-btn-group {
-        /* Remove desktop offset, center naturally */
         padding-left: 0;
     }
 
@@ -214,12 +224,13 @@ body {
 
 @media (max-width: 480px) {
     .nav-btn {
-        padding: 0.4rem 0.5rem;
+        padding: 0.45rem 0.6rem;
         font-size: 0.75rem;
     }
 
     .nav-brand {
-        font-size: 0.9rem;
+        font-size: 0.85rem;
+        margin-right: 0.5rem;
     }
 }
 
@@ -1748,19 +1759,18 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 @media (max-width: 768px) {
     /* Navigation Bar */
     .nav-brand {
-        display: none !important; /* Hide brand text on mobile to save space */
+        display: none !important;
     }
     .main-nav {
-        padding: 0.5rem !important;
+        padding: 0.4rem 0.5rem !important;
     }
     .nav-btn-group {
         padding-left: 0;
-        gap: 0.3rem;
-        flex-wrap: wrap;
+        gap: 0.15rem;
         justify-content: center;
     }
     .nav-btn {
-        padding: 0.4rem 0.5rem;
+        padding: 0.45rem 0.65rem;
         font-size: 0.75rem;
         flex: 1 1 auto;
         text-align: center;
@@ -2352,12 +2362,16 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 }
 
 [data-theme="light"] .nav-btn.active {
-    background: rgba(0, 0, 0, 0.08);
-    color: #0f172a;
+    color: #92400e;
 }
 
 [data-theme="light"] .nav-btn:hover {
-    background: rgba(0, 0, 0, 0.04);
+    color: #475569;
+}
+
+[data-theme="light"] .nav-indicator {
+    background: linear-gradient(90deg, #d97706, #f59e0b);
+    box-shadow: 0 0 6px rgba(217, 119, 6, 0.3);
 }
 
 [data-theme="light"] .btn-small,
