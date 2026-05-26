@@ -32,6 +32,7 @@ app.use(cors({
 }));
 app.use(express.json({ limit: '10kb' })); // 限制请求体大小
 app.use(express.static(path.join(__dirname, 'public')));
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // API Routes
 const authRoutes = require('./src/routes/auth');

@@ -39,6 +39,11 @@ const db = new sqlite3.Database(DB_PATH, (_err) => {
 
             // User role migration
             db.run("ALTER TABLE users ADD COLUMN role TEXT DEFAULT 'user'", (_err) => { });
+            // Profile migrations
+            db.run("ALTER TABLE users ADD COLUMN nickname TEXT DEFAULT ''", (_err) => { });
+            db.run("ALTER TABLE users ADD COLUMN avatar TEXT DEFAULT ''", (_err) => { });
+            db.run("ALTER TABLE users ADD COLUMN email TEXT DEFAULT ''", (_err) => { });
+            db.run("ALTER TABLE users ADD COLUMN bio TEXT DEFAULT ''", (_err) => { });
             // Tags migration
             db.run("ALTER TABLE records ADD COLUMN tags TEXT DEFAULT ''", (_err) => { });
             // Depreciation migration

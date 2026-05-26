@@ -347,8 +347,11 @@ document.addEventListener('DOMContentLoaded', () => {
         if (token && username) {
             authSection.classList.add('hidden');
             dashboardSection.classList.remove('hidden');
-            displayUsername.textContent = username;
-            
+            if (displayUsername) displayUsername.textContent = username;
+
+            // Load profile & settings
+            if (typeof window.initSettings === 'function') window.initSettings();
+
             if (navAdminBtn) {
                 if (role === 'admin') {
                     navAdminBtn.classList.remove('hidden');

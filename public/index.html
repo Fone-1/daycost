@@ -7,6 +7,7 @@
 
     <link rel="manifest" href="/manifest.json">
     <meta name="theme-color" content="#0f172a">
+    <meta name="app-version" content="1.0.0">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="DayCost">
@@ -308,19 +309,48 @@
 
         <div id="pane-settings" class="spa-pane hidden">
             <div class="settings-grid">
-                <section class="card glass compact-card">
-                    <h3>账号</h3>
-                    <div class="settings-row">
-                        <span>当前账号：<strong id="displayUsername">User</strong></span>
-                        <div class="settings-actions">
-                            <button id="changePwdBtn" class="btn secondary-btn">修改密码</button>
-                            <button id="logoutBtn" class="btn danger-btn">退出登录</button>
+                <!-- Profile Card -->
+                <section class="card glass profile-card">
+                    <div class="profile-header">
+                        <div class="profile-avatar" id="profileAvatar"></div>
+                        <div class="profile-info">
+                            <div class="profile-name" id="profileName">User</div>
+                            <div class="profile-bio" id="profileBio"></div>
                         </div>
+                    </div>
+                    <div class="profile-stats">
+                        <div class="profile-stat">
+                            <span class="profile-stat-value" id="profileStatDays">-</span>
+                            <span class="profile-stat-label">使用天数</span>
+                        </div>
+                        <div class="profile-stat">
+                            <span class="profile-stat-value" id="profileStatTotal">-</span>
+                            <span class="profile-stat-label">总资产</span>
+                        </div>
+                        <div class="profile-stat">
+                            <span class="profile-stat-value" id="profileStatActive">-</span>
+                            <span class="profile-stat-label">服役中</span>
+                        </div>
+                    </div>
+                    <button id="editProfileBtn" class="btn secondary-btn profile-edit-btn">编辑资料</button>
+                </section>
+
+                <!-- Account Security -->
+                <section class="card glass compact-card">
+                    <h3>账号安全</h3>
+                    <div class="settings-row settings-clickable" id="changePwdBtn">
+                        <span>修改密码</span>
+                        <span class="settings-arrow">›</span>
+                    </div>
+                    <div class="settings-row settings-clickable" id="logoutBtn">
+                        <span class="text-danger">退出登录</span>
+                        <span class="settings-arrow">›</span>
                     </div>
                 </section>
 
+                <!-- Appearance -->
                 <section class="card glass compact-card">
-                    <h3>外观设置</h3>
+                    <h3>外观</h3>
                     <div class="settings-row">
                         <span>主题模式</span>
                         <div class="settings-actions">
@@ -333,15 +363,38 @@
                     </div>
                 </section>
 
+                <!-- Data Management -->
                 <section class="card glass compact-card">
                     <h3>数据管理</h3>
-                    <p class="muted">导出报表用于分析，或使用 .daycost 备份在不同设备之间迁移数据。</p>
-                    <div class="stack-actions">
-                        <button id="exportCsvBtn" class="btn data-btn">导出 CSV 报表</button>
-                        <button id="backupExportBtn" class="btn data-btn">导出 .daycost 备份</button>
-                        <button id="backupImportBtn" class="btn data-btn">导入 .daycost 备份</button>
-                        <input type="file" id="importFileInput" accept=".daycost,.json" hidden>
+                    <div class="settings-row settings-clickable" id="exportCsvBtn">
+                        <span>导出 CSV 报表</span>
+                        <span class="settings-arrow">›</span>
                     </div>
+                    <div class="settings-row settings-clickable" id="backupExportBtn">
+                        <span>导出 .daycost 备份</span>
+                        <span class="settings-arrow">›</span>
+                    </div>
+                    <div class="settings-row settings-clickable" id="backupImportBtn">
+                        <span>导入 .daycost 备份</span>
+                        <span class="settings-arrow">›</span>
+                    </div>
+                    <input type="file" id="importFileInput" accept=".daycost,.json" hidden>
+                </section>
+
+                <!-- About -->
+                <section class="card glass compact-card">
+                    <h3>关于</h3>
+                    <div class="settings-row">
+                        <span>DayCost</span>
+                        <span class="text-muted" id="appVersion">v1.0.0</span>
+                    </div>
+                    <div class="settings-row">
+                        <span>日均成本追踪器</span>
+                    </div>
+                    <a class="settings-row settings-clickable" href="https://github.com/Fone-1/daycost" target="_blank" rel="noopener noreferrer" style="text-decoration:none;color:inherit">
+                        <span>GitHub 仓库</span>
+                        <span class="settings-arrow">↗</span>
+                    </a>
                 </section>
             </div>
         </div>
@@ -518,6 +571,37 @@
         </div>
     </div>
 
+    <div id="editProfileModal" class="modal-overlay hidden">
+        <div class="modal-content glass small-modal">
+            <button class="modal-close" id="editProfileCloseBtn">&times;</button>
+            <h2>编辑个人资料</h2>
+            <form id="editProfileForm" class="structured-form">
+                <div id="editProfileError" class="error-msg hidden"></div>
+                <div class="profile-avatar-edit">
+                    <div class="profile-avatar preview" id="editAvatarPreview"></div>
+                    <div class="avatar-actions">
+                        <button type="button" class="btn secondary-btn" id="editAvatarUploadBtn">更换头像</button>
+                        <button type="button" class="btn danger-outline-btn" id="editAvatarRemoveBtn">移除头像</button>
+                        <input type="file" id="editAvatarInput" accept="image/jpeg,image/png,image/webp" hidden>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="editNickname">昵称</label>
+                    <input type="text" id="editNickname" maxlength="20" placeholder="给自己起个名字">
+                </div>
+                <div class="form-group">
+                    <label for="editEmail">邮箱</label>
+                    <input type="email" id="editEmail" placeholder="name@example.com">
+                </div>
+                <div class="form-group">
+                    <label for="editBio">个性签名</label>
+                    <input type="text" id="editBio" maxlength="50" placeholder="一句话介绍自己">
+                </div>
+                <button type="submit" class="btn">保存</button>
+            </form>
+        </div>
+    </div>
+
     <div id="customConfirmModal" class="modal-overlay hidden">
         <div class="modal-content glass small-modal center-modal">
             <h2 id="confirmTitle">确认操作</h2>
@@ -677,6 +761,7 @@
     <script src="/clusterize.min.js"></script>
     <script src="/chart.min.js"></script>
     <script src="jsQR.min.js"></script>
+    <script src="settings.js?v=1"></script>
     <script src="script.js?v=9"></script>
 </body>
 </html>
