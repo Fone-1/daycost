@@ -39,5 +39,5 @@
     "no-self-compare": "error",
     "no-template-curly-in-string": "warn"
   },
-  "ignorePatterns": ["node_modules/", "public/lib/"]
+  "ignorePatterns": ["node_modules/", "public/lib/", "public/*.min.js"]
 }

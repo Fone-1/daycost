@@ -128,6 +128,7 @@ router.get('/profile', authenticateToken, (req, res) => {
             const avatarUrl = user.avatar ? `${user.avatar}?t=${Date.now()}` : '';
 
             res.json({
+                id: user.id,
                 username: user.username,
                 nickname: user.nickname || '',
                 avatar: avatarUrl,

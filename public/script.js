@@ -2261,7 +2261,9 @@ document.addEventListener('DOMContentLoaded', () => {
         if (emptyState) emptyState.style.display = 'none';
 
         container.innerHTML = codes.map(c => {
-            const pct = (c.remaining / c.period) * 100;
+            const period = Number(c.period) || 30;
+            const pct = (c.remaining / period) * 100;
+            const formattedCode = String(c.code).replace(/(.{3})(?=.)/g, '$1 ');
             let colorClass = 'green';
             if (c.remaining <= 5) colorClass = 'red';
             else if (c.remaining <= 10) colorClass = 'yellow';
@@ -2277,7 +2279,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             <button class="totp-delete-btn" data-totp-id="${c.id}" title="删除">🗑️</button>
                         </div>
                     </div>
-                    <div class="totp-code" data-totp-code="${c.code}" title="点击复制">${c.code.slice(0,3)} ${c.code.slice(3)}</div>
+                    <div class="totp-code" data-totp-code="${c.code}" title="点击复制">${formattedCode}</div>
                     <div class="totp-progress-bar"><div class="totp-progress-fill ${colorClass}" style="width:${pct}%"></div></div>
                     <div class="totp-card-footer">
                         <span class="totp-group-tag">${escapeHtml(c.group || '默认分组')}</span>
@@ -2517,6 +2519,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     label: parsed.label,
                     secret: parsed.secret,
                     issuer: parsed.issuer,
+                    digits: parsed.digits,
+                    period: parsed.period,
                     group: totpCurrentGroup || '默认分组'
                 })
             });
@@ -2588,6 +2592,8 @@ document.addEventListener('DOMContentLoaded', () => {
                             label: e.name || e.label || 'Unknown',
                             secret: e.secret,
                             issuer: e.issuer || '',
+                            digits: e.digits,
+                            period: e.period,
                             group: e.group || '默认分组'
                         }));
                     }

@@ -30,7 +30,7 @@ app.use(cors({
     methods: ['GET', 'POST', 'PUT', 'DELETE'],
     allowedHeaders: ['Content-Type', 'Authorization']
 }));
-app.use(express.json({ limit: '10kb' })); // 限制请求体大小
+app.use(express.json({ limit: '2mb' })); // 支持账本备份与 TOTP 批量导入
 app.use(express.static(path.join(__dirname, 'public')));
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 

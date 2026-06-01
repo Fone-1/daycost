@@ -130,13 +130,26 @@ FROM records;`);
                 iv TEXT NOT NULL,
                 auth_tag TEXT NOT NULL,
                 issuer TEXT DEFAULT '',
-                digits INTEGER DEFAULT 30,
+                digits INTEGER DEFAULT 6,
+                period INTEGER DEFAULT 30,
                 group_name TEXT DEFAULT '默认分组',
                 created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (user_id) REFERENCES users(id)
             )`);
             // TOTP group migration
             db.run("ALTER TABLE totp_entries ADD COLUMN group_name TEXT DEFAULT '默认分组'", (_err) => { });
+            db.run("ALTER TABLE totp_entries ADD COLUMN period INTEGER DEFAULT 30", (_err) => { });
+            db.run(`UPDATE totp_entries
+                SET
+                    period = CASE
+                        WHEN IFNULL(period, 30) BETWEEN 10 AND 300 THEN IFNULL(period, 30)
+                        WHEN IFNULL(digits, 6) BETWEEN 10 AND 300 THEN digits
+                        ELSE 30
+                    END,
+                    digits = CASE
+                        WHEN IFNULL(digits, 6) BETWEEN 6 AND 8 THEN digits
+                        ELSE 6
+                    END`);
 
             // Admin: disable account migration
             db.run("ALTER TABLE users ADD COLUMN is_disabled INTEGER DEFAULT 0", (_err) => { });

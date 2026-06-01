@@ -54,10 +54,8 @@ router.get('/overview', authenticateToken, requireAdmin, (req, res) => {
                 `, [], (err4, trend) => {
                     if (err4) return res.status(500).json({ error: '查询失败' });
 
-                    const os = require('os');
                     const pkg = require('../../package.json');
                     const fs = require('fs');
-                    const path = require('path');
                     const dbPath = require('../config/env').DB_PATH;
                     let dbSize = 'unknown';
                     try {
