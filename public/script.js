@@ -1170,7 +1170,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         return `
             <div class="history-item ${classModifiers}" data-id="${record.id}">
-                <div class="swipe-wrapper" ontouchstart="handleSwipeStart(event)" ontouchmove="handleSwipeMove(event)" ontouchend="handleSwipeEnd(event)">
+                <div class="swipe-wrapper">
                     <div class="swipe-content">
                         <div class="history-info">
                             <span class="history-name" data-fulltext="${safeName}">${safeName} ${badges}${tagBadges}</span>
@@ -1940,55 +1940,67 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- Mobile Swipe-to-Reveal Logic ---
     let touchStartX = 0;
+    let touchStartY = 0;
+    let swipeStartOffset = 0;
     let swipeWrapper = null;
-    
-    window.handleSwipeStart = function(e) {
-        if(window.innerWidth > 799) return; // Only on mobile
-        const wrapper = e.currentTarget;
-        
+
+    function getSwipeLimit(wrapper) {
+        const actions = wrapper?.querySelector('.swipe-actions');
+        return actions ? actions.offsetWidth : 100;
+    }
+
+    function getSwipeX(wrapper) {
+        const match = /translateX\((-?\d+(?:\.\d+)?)px\)/.exec(wrapper?.style.transform || '');
+        if (match) return Number(match[1]);
+        return wrapper?.classList.contains('swiped') ? -getSwipeLimit(wrapper) : 0;
+    }
+
+    window.handleSwipeStart = function (e) {
+        if (window.innerWidth > 799 || !e.touches?.length) return; // Only on mobile
+        const wrapper = e.currentTarget?.classList?.contains('swipe-wrapper')
+            ? e.currentTarget
+            : e.target.closest('.swipe-wrapper');
+        if (!wrapper) return;
+
         // Auto-close other swiped items
         document.querySelectorAll('.swipe-wrapper.swiped').forEach(w => {
-            if(w !== wrapper) {
+            if (w !== wrapper) {
                 w.style.transform = 'translateX(0)';
                 w.classList.remove('swiped');
             }
         });
-        
+
         touchStartX = e.touches[0].clientX;
+        touchStartY = e.touches[0].clientY;
+        swipeStartOffset = getSwipeX(wrapper);
         swipeWrapper = wrapper;
         wrapper.style.transition = 'none'; // Instant follow finger
     };
 
-    window.handleSwipeMove = function(e) {
-        if(!swipeWrapper || window.innerWidth > 799) return;
+    window.handleSwipeMove = function (e) {
+        if (!swipeWrapper || window.innerWidth > 799 || !e.touches?.length) return;
         const currentX = e.touches[0].clientX;
-        const diff = currentX - touchStartX;
-        
-        if (diff < 0 && diff > -110) { // Drag left
-            swipeWrapper.style.transform = `translateX(${diff}px)`;
-            if (Math.abs(diff) > 15) { 
-                e.preventDefault(); // Stop vertical scroll if horizontal swipe detected
-            }
-        } else if (diff > 0 && swipeWrapper.classList.contains('swiped')) { // Drag right to close
-            const newPos = -100 + diff;
-            if (newPos <= 0) {
-                swipeWrapper.style.transform = `translateX(${newPos}px)`;
-            }
-        }
+        const currentY = e.touches[0].clientY;
+        const diffX = currentX - touchStartX;
+        const diffY = currentY - touchStartY;
+
+        if (Math.abs(diffX) <= Math.abs(diffY) || Math.abs(diffX) < 8) return;
+
+        e.preventDefault(); // Stop vertical scroll only after a horizontal gesture is clear.
+        const limit = getSwipeLimit(swipeWrapper);
+        const nextX = Math.max(-limit, Math.min(0, swipeStartOffset + diffX));
+        swipeWrapper.style.transform = `translateX(${nextX}px)`;
     };
 
-    window.handleSwipeEnd = function(_e) {
-        if(!swipeWrapper || window.innerWidth > 799) return;
+    window.handleSwipeEnd = function (_e) {
+        if (!swipeWrapper || window.innerWidth > 799) return;
         swipeWrapper.style.transition = 'transform 0.3s cubic-bezier(0.1, 0.7, 0.1, 1)';
-        
-        const transformStr = swipeWrapper.style.transform;
-        let x = 0;
-        if(transformStr.includes('translateX')) {
-            x = parseInt(transformStr.replace('translateX(', '').replace('px)', ''));
-        }
-        
-        if (x < -40) { // If dragged left enough, snap open
-            swipeWrapper.style.transform = 'translateX(-100px)';
+
+        const limit = getSwipeLimit(swipeWrapper);
+        const x = getSwipeX(swipeWrapper);
+
+        if (x < -Math.min(40, limit * 0.35)) { // If dragged left enough, snap open
+            swipeWrapper.style.transform = `translateX(-${limit}px)`;
             swipeWrapper.classList.add('swiped');
         } else { // Snap back closed
             swipeWrapper.style.transform = 'translateX(0)';
@@ -1996,6 +2008,13 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         swipeWrapper = null;
     };
+
+    if (historyScrollEl) {
+        historyScrollEl.addEventListener('touchstart', window.handleSwipeStart, { passive: true });
+        historyScrollEl.addEventListener('touchmove', window.handleSwipeMove, { passive: false });
+        historyScrollEl.addEventListener('touchend', window.handleSwipeEnd);
+        historyScrollEl.addEventListener('touchcancel', window.handleSwipeEnd);
+    }
     
     // Load TOTP codes when switching to TOTP tab
     document.querySelectorAll('.nav-btn').forEach(btn => {
