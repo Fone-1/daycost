@@ -15,16 +15,39 @@ const router = express.Router();
 const avatarDir = path.join(__dirname, '../../uploads/avatars');
 if (!fs.existsSync(avatarDir)) fs.mkdirSync(avatarDir, { recursive: true });
 
+const AVATAR_TYPES = {
+    'image/jpeg': { ext: 'jpg', magic: (buf) => buf.length >= 3 && buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff },
+    'image/png': { ext: 'png', magic: (buf) => buf.length >= 8 && buf.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])) },
+    'image/webp': { ext: 'webp', magic: (buf) => buf.length >= 12 && buf.subarray(0, 4).toString('ascii') === 'RIFF' && buf.subarray(8, 12).toString('ascii') === 'WEBP' }
+};
+
+function getAvatarExt(mimetype) {
+    return AVATAR_TYPES[mimetype]?.ext || 'bin';
+}
+
+function isValidAvatarFile(filePath, mimetype) {
+    const type = AVATAR_TYPES[mimetype];
+    if (!type) return false;
+    const buf = fs.readFileSync(filePath);
+    return type.magic(buf);
+}
+
+function removeExistingAvatars(userId, exceptPath = '') {
+    Object.values(AVATAR_TYPES).forEach(({ ext }) => {
+        const filePath = path.join(avatarDir, `${userId}.${ext}`);
+        if (filePath !== exceptPath && fs.existsSync(filePath)) fs.unlinkSync(filePath);
+    });
+}
+
 const avatarStorage = multer.diskStorage({
     destination: (_req, _file, cb) => cb(null, avatarDir),
-    filename: (req, _file, cb) => cb(null, `${req.user.id}.webp`)
+    filename: (req, file, cb) => cb(null, `${req.user.id}.${getAvatarExt(file.mimetype)}`)
 });
 const avatarUpload = multer({
     storage: avatarStorage,
-    limits: { fileSize: 2 * 1024 * 1024 },
+    limits: { fileSize: 2 * 1024 * 1024, files: 1 },
     fileFilter: (_req, file, cb) => {
-        const allowed = ['image/jpeg', 'image/png', 'image/webp'];
-        cb(null, allowed.includes(file.mimetype));
+        cb(null, Boolean(AVATAR_TYPES[file.mimetype]));
     }
 });
 
@@ -73,7 +96,11 @@ router.post('/login', authLimiter, (req, res) => {
         try {
             if (await bcrypt.compare(password, user.password_hash)) {
                 const userRole = user.role || 'user';
-                const token = jwt.sign({ id: user.id, username: user.username, role: userRole }, JWT_SECRET, { expiresIn: '7d' });
+                const token = jwt.sign(
+                    { id: user.id, username: user.username, role: userRole, token_version: Number(user.token_version || 0) },
+                    JWT_SECRET,
+                    { expiresIn: '7d' }
+                );
                 log(user.id, user.username, 'login', '', getClientIp(req));
                 res.json({ token, username: user.username, role: userRole });
             } else {
@@ -99,7 +126,7 @@ router.put('/password', authenticateToken, (req, res) => {
             if (!match) return res.status(400).json({ error: '原密码错误' });
 
             const hashed = await bcrypt.hash(newPassword, 10);
-            db.run(`UPDATE users SET password_hash = ? WHERE id = ?`, [hashed, req.user.id], function (updateErr) {
+            db.run(`UPDATE users SET password_hash = ?, token_version = COALESCE(token_version, 0) + 1 WHERE id = ?`, [hashed, req.user.id], function (updateErr) {
                 if (updateErr) return res.status(500).json({ error: '更新密码失败' });
                 res.json({ message: '密码修改成功，请重新登录' });
             });
@@ -167,7 +194,14 @@ router.post('/avatar', authenticateToken, (req, res) => {
         }
         if (err || !req.file) return res.status(400).json({ error: '请上传 jpg/png/webp 格式的图片' });
 
-        const avatarPath = `/uploads/avatars/${req.user.id}.webp`;
+        if (!isValidAvatarFile(req.file.path, req.file.mimetype)) {
+            fs.unlinkSync(req.file.path);
+            return res.status(400).json({ error: '头像文件内容与图片格式不匹配' });
+        }
+
+        removeExistingAvatars(req.user.id, req.file.path);
+
+        const avatarPath = `/uploads/avatars/${req.file.filename}`;
         db.run(`UPDATE users SET avatar = ? WHERE id = ?`, [avatarPath, req.user.id], (dbErr) => {
             if (dbErr) return res.status(500).json({ error: '保存头像路径失败' });
             res.json({ avatar: `${avatarPath}?t=${Date.now()}` });
@@ -177,8 +211,7 @@ router.post('/avatar', authenticateToken, (req, res) => {
 
 // Remove Avatar
 router.delete('/avatar', authenticateToken, (req, res) => {
-    const filePath = path.join(avatarDir, `${req.user.id}.webp`);
-    if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+    removeExistingAvatars(req.user.id);
     db.run(`UPDATE users SET avatar = '' WHERE id = ?`, [req.user.id], (err) => {
         if (err) return res.status(500).json({ error: '移除头像失败' });
         res.json({ message: '头像已移除' });

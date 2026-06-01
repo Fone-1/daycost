@@ -9,6 +9,7 @@ const db = new sqlite3.Database(DB_PATH, (_err) => {
 
         // --- PERFORMANCE: Enable WAL Mode ---
         db.run('PRAGMA journal_mode = WAL');
+        db.run('PRAGMA foreign_keys = ON');
 
         // Initialize tables
         db.serialize(() => {
@@ -39,6 +40,7 @@ const db = new sqlite3.Database(DB_PATH, (_err) => {
 
             // User role migration
             db.run("ALTER TABLE users ADD COLUMN role TEXT DEFAULT 'user'", (_err) => { });
+            db.run("ALTER TABLE users ADD COLUMN token_version INTEGER DEFAULT 0", (_err) => { });
             // Profile migrations
             db.run("ALTER TABLE users ADD COLUMN nickname TEXT DEFAULT ''", (_err) => { });
             db.run("ALTER TABLE users ADD COLUMN avatar TEXT DEFAULT ''", (_err) => { });

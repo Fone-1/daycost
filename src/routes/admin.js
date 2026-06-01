@@ -161,7 +161,7 @@ router.post('/user/:id/reset-password', authenticateToken, requireAdmin, (req, r
 
         try {
             const hashed = await bcrypt.hash(tempPassword, 10);
-            db.run(`UPDATE users SET password_hash = ? WHERE id = ?`, [hashed, targetId], (updateErr) => {
+            db.run(`UPDATE users SET password_hash = ?, token_version = COALESCE(token_version, 0) + 1 WHERE id = ?`, [hashed, targetId], (updateErr) => {
                 if (updateErr) return res.status(500).json({ error: '重置密码失败' });
                 log(req.user.id, req.user.username, 'admin_reset_pwd', `用户: ${user.username}`, getClientIp(req));
                 res.json({ message: '密码已重置', tempPassword, username: user.username });
@@ -187,7 +187,9 @@ router.delete('/user/:id', authenticateToken, requireAdmin, (req, res) => {
             db.run("BEGIN TRANSACTION");
             db.run("DELETE FROM records WHERE user_id = ?", [targetUserId], (delErr) => {
                 if (delErr) { db.run("ROLLBACK"); return res.status(500).json({ error: '清理用户账单数据失败' }); }
-                db.run("DELETE FROM users WHERE id = ?", [targetUserId], function (delErr2) {
+                db.run("DELETE FROM totp_entries WHERE user_id = ?", [targetUserId], (totpErr) => {
+                    if (totpErr) { db.run("ROLLBACK"); return res.status(500).json({ error: '清理用户 TOTP 数据失败' }); }
+                    db.run("DELETE FROM users WHERE id = ?", [targetUserId], function (delErr2) {
                     if (delErr2 || this.changes === 0) { db.run("ROLLBACK"); return res.status(500).json({ error: '铲除目标用户主体失败' }); }
                     db.run("COMMIT");
                     log(req.user.id, req.user.username, 'admin_delete_user', `用户: ${user.username}`, getClientIp(req));
@@ -196,6 +198,7 @@ router.delete('/user/:id', authenticateToken, requireAdmin, (req, res) => {
             });
         });
     });
+});
 });
 
 module.exports = router;
