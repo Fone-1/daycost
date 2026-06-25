@@ -36,7 +36,16 @@ app.use(cors({
 }));
 app.use(express.json({ limit: '2mb' })); // 支持账本备份与 TOTP 批量导入
 app.use(express.static(path.join(__dirname, 'public')));
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+app.use('/uploads', express.static(path.join(__dirname, 'uploads'), {
+    dotfiles: 'deny',        // 拒绝访问点文件 (.env, .git, etc.)
+    index: false,            // 禁止目录列表
+    etag: true,              // 启用ETag缓存
+    lastModified: true,      // 启用Last-Modified
+    maxAge: '1d',            // 缓存1天
+    setHeaders: (res) => {
+        res.setHeader('X-Content-Type-Options', 'nosniff');
+    }
+}));
 
 // API Routes
 const authRoutes = require('./src/routes/auth');

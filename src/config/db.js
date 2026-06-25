@@ -30,28 +30,36 @@ const db = new sqlite3.Database(DB_PATH, (_err) => {
                 FOREIGN KEY (user_id) REFERENCES users(id)
             )`);
 
-            // Safe Migrations
-            db.run("ALTER TABLE records ADD COLUMN status TEXT DEFAULT 'active'", (_err) => { });
-            db.run("ALTER TABLE records ADD COLUMN end_date TEXT", (_err) => { });
-            db.run("ALTER TABLE records ADD COLUMN resale_price REAL DEFAULT 0", (_err) => { });
-            db.run("ALTER TABLE records ADD COLUMN parent_id INTEGER DEFAULT NULL", (_err) => { });
-            db.run("ALTER TABLE records ADD COLUMN is_deleted INTEGER DEFAULT 0", (_err) => { });
-            db.run("ALTER TABLE records ADD COLUMN deleted_at DATETIME DEFAULT NULL", (_err) => { });
+            // Safe Migrations - ignore "duplicate column name" errors (idempotent)
+            const safeMigration = (sql) => {
+                db.run(sql, (err) => {
+                    if (err && !err.message.includes('duplicate column name')) {
+                        console.error('Migration error:', err.message);
+                    }
+                });
+            };
+
+            safeMigration("ALTER TABLE records ADD COLUMN status TEXT DEFAULT 'active'");
+            safeMigration("ALTER TABLE records ADD COLUMN end_date TEXT");
+            safeMigration("ALTER TABLE records ADD COLUMN resale_price REAL DEFAULT 0");
+            safeMigration("ALTER TABLE records ADD COLUMN parent_id INTEGER DEFAULT NULL");
+            safeMigration("ALTER TABLE records ADD COLUMN is_deleted INTEGER DEFAULT 0");
+            safeMigration("ALTER TABLE records ADD COLUMN deleted_at DATETIME DEFAULT NULL");
 
             // User role migration
-            db.run("ALTER TABLE users ADD COLUMN role TEXT DEFAULT 'user'", (_err) => { });
-            db.run("ALTER TABLE users ADD COLUMN token_version INTEGER DEFAULT 0", (_err) => { });
+            safeMigration("ALTER TABLE users ADD COLUMN role TEXT DEFAULT 'user'");
+            safeMigration("ALTER TABLE users ADD COLUMN token_version INTEGER DEFAULT 0");
             // Profile migrations
-            db.run("ALTER TABLE users ADD COLUMN nickname TEXT DEFAULT ''", (_err) => { });
-            db.run("ALTER TABLE users ADD COLUMN avatar TEXT DEFAULT ''", (_err) => { });
-            db.run("ALTER TABLE users ADD COLUMN email TEXT DEFAULT ''", (_err) => { });
-            db.run("ALTER TABLE users ADD COLUMN bio TEXT DEFAULT ''", (_err) => { });
+            safeMigration("ALTER TABLE users ADD COLUMN nickname TEXT DEFAULT ''");
+            safeMigration("ALTER TABLE users ADD COLUMN avatar TEXT DEFAULT ''");
+            safeMigration("ALTER TABLE users ADD COLUMN email TEXT DEFAULT ''");
+            safeMigration("ALTER TABLE users ADD COLUMN bio TEXT DEFAULT ''");
             // Tags migration
-            db.run("ALTER TABLE records ADD COLUMN tags TEXT DEFAULT ''", (_err) => { });
+            safeMigration("ALTER TABLE records ADD COLUMN tags TEXT DEFAULT ''");
             // Depreciation migration
-            db.run("ALTER TABLE records ADD COLUMN depreciation_method TEXT DEFAULT 'straight_line'", (_err) => { });
-            db.run("ALTER TABLE records ADD COLUMN expected_lifespan INTEGER DEFAULT 1095", (_err) => { });
-            db.run("ALTER TABLE records ADD COLUMN expected_salvage REAL DEFAULT 0", (_err) => { });
+            safeMigration("ALTER TABLE records ADD COLUMN depreciation_method TEXT DEFAULT 'straight_line'");
+            safeMigration("ALTER TABLE records ADD COLUMN expected_lifespan INTEGER DEFAULT 1095");
+            safeMigration("ALTER TABLE records ADD COLUMN expected_salvage REAL DEFAULT 0");
 
             // --- PERFORMANCE: Create SQL View for Computed Columns ---
             db.run(`CREATE VIEW IF NOT EXISTS v_records_computed AS
@@ -139,8 +147,8 @@ FROM records;`);
                 FOREIGN KEY (user_id) REFERENCES users(id)
             )`);
             // TOTP group migration
-            db.run("ALTER TABLE totp_entries ADD COLUMN group_name TEXT DEFAULT '默认分组'", (_err) => { });
-            db.run("ALTER TABLE totp_entries ADD COLUMN period INTEGER DEFAULT 30", (_err) => { });
+            safeMigration("ALTER TABLE totp_entries ADD COLUMN group_name TEXT DEFAULT '默认分组'");
+            safeMigration("ALTER TABLE totp_entries ADD COLUMN period INTEGER DEFAULT 30");
             db.run(`UPDATE totp_entries
                 SET
                     period = CASE
@@ -154,7 +162,7 @@ FROM records;`);
                     END`);
 
             // Admin: disable account migration
-            db.run("ALTER TABLE users ADD COLUMN is_disabled INTEGER DEFAULT 0", (_err) => { });
+            safeMigration("ALTER TABLE users ADD COLUMN is_disabled INTEGER DEFAULT 0");
 
             // Admin: audit logs table
             db.run(`CREATE TABLE IF NOT EXISTS audit_logs (

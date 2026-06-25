@@ -14,13 +14,17 @@
     <link rel="apple-touch-icon" href="/icon-512.png">
 
     <script src="js/theme-preload.js?v=1"></script>
-    <link rel="stylesheet" href="style.css?v=10">
+    <link rel="stylesheet" href="style.css?v=11">
     <link rel="stylesheet" href="/clusterize.min.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
 </head>
 <body>
+    <!-- Offline detection banner -->
+    <div id="offlineBanner" class="offline-banner" role="alert" aria-live="assertive">
+        <span class="offline-icon">⚡</span> 网络连接已断开，部分功能可能受限
+    </div>
     <div class="container" id="authSection">
         <header>
             <h1>DayCost</h1>
@@ -29,9 +33,9 @@
 
         <main>
             <div class="card glass auth-card">
-                <div class="auth-tabs">
-                    <button class="tab active" id="tabLogin">登录</button>
-                    <button class="tab" id="tabRegister">注册</button>
+                <div class="auth-tabs" role="tablist" aria-label="认证方式">
+                    <button class="tab active" id="tabLogin" role="tab" aria-selected="true">登录</button>
+                    <button class="tab" id="tabRegister" role="tab" aria-selected="false">注册</button>
                 </div>
 
                 <form id="authForm">
@@ -44,7 +48,7 @@
                         <label for="password">密码</label>
                         <input type="password" id="password" autocomplete="current-password" required>
                     </div>
-                    <button type="submit" class="btn" id="authSubmitBtn">登录</button>
+                    <button type="submit" class="btn btn-ripple" id="authSubmitBtn">登录</button>
                 </form>
             </div>
         </main>
@@ -53,34 +57,39 @@
     <div class="container dashboard-container hidden" id="dashboardSection">
         <nav class="main-nav glass">
             <div class="nav-brand">DayCost</div>
-            <div class="nav-btn-group">
-                <button class="nav-btn active" data-target="pane-home">账本</button>
-                <button class="nav-btn" data-target="pane-stats">统计</button>
-                <button class="nav-btn" data-target="pane-trash">回收站</button>
-                <button class="nav-btn" data-target="pane-totp">密钥</button>
-                <button class="nav-btn" data-target="pane-settings">设置</button>
+            <div class="nav-btn-group" role="tablist" aria-label="主导航">
+                <button class="nav-btn active" data-target="pane-home" role="tab" aria-selected="true" aria-controls="pane-home">账本</button>
+                <button class="nav-btn" data-target="pane-stats" role="tab" aria-selected="false" aria-controls="pane-stats">统计</button>
+                <div class="nav-more-wrapper">
+                    <button class="nav-more-btn" id="navMoreBtn" aria-haspopup="true" aria-expanded="false">更多 <span class="caret">▾</span></button>
+                    <div class="nav-more-dropdown" id="navMoreDropdown" role="menu">
+                        <button class="nav-more-item" data-target="pane-totp" role="menuitem" aria-controls="pane-totp">密钥</button>
+                        <button class="nav-more-item" data-target="pane-trash" role="menuitem" aria-controls="pane-trash">回收站</button>
+                    </div>
+                </div>
                 <div class="nav-indicator"></div>
             </div>
+            <button class="nav-settings-btn" id="navSettingsBtn" data-target="pane-settings" aria-label="设置" title="设置">⚙</button>
         </nav>
 
         <div id="pane-home" class="spa-pane active">
             <main class="pane-main">
-                <button id="fabAddBtn" class="fab-btn" title="添加记录">+</button>
+                <button id="fabAddBtn" class="fab-btn btn-ripple" title="添加记录" aria-label="添加新资产记录">+</button>
 
                 <section class="history-section glass">
                     <div class="history-header">
                         <div class="history-header-top">
                             <h2>资产记录</h2>
-                            <input type="text" id="searchInput" placeholder="搜索物品或标签" class="sort-select search-input">
+                            <input type="text" id="searchInput" placeholder="搜索物品或标签" class="sort-select search-input" aria-label="搜索资产记录">
                         </div>
                         <div class="history-header-filters">
-                            <select id="filterSelect" class="sort-select filter-select">
+                            <select id="filterSelect" class="sort-select filter-select" aria-label="按状态筛选">
                                 <option value="all">全部状态</option>
                                 <option value="active">使用中</option>
                                 <option value="broken">已损坏</option>
                                 <option value="sold">已回血</option>
                             </select>
-                            <select id="sortSelect" class="sort-select filter-select">
+                            <select id="sortSelect" class="sort-select filter-select" aria-label="排序方式">
                                 <option value="dateDesc">最近添加</option>
                                 <option value="costDesc">日均成本从高到低</option>
                                 <option value="costAsc">日均成本从低到高</option>
@@ -90,10 +99,10 @@
                             </select>
                         </div>
                     </div>
-                    <div id="historyListScroll" class="history-list clusterize-scroll">
+                    <div id="historyListScroll" class="history-list clusterize-scroll" role="list" aria-label="资产记录列表">
                         <div id="historyList" class="hidden"></div>
                         <div id="historyListContent" class="clusterize-content"></div>
-                        <div id="loadingIndicator" class="loading-row hidden">加载中...</div>
+                        <div id="loadingIndicator" class="loading-row hidden" role="status" aria-live="polite">加载中...</div>
                     </div>
                 </section>
             </main>
@@ -109,11 +118,11 @@
                         </div>
                         <button id="statsClearFilterBtn" class="btn-small">清除联动筛选</button>
                     </div>
-                    <div class="stats-view-tabs" id="statsViewTabs">
-                        <button class="stats-view-btn active" data-stats-view="tag">按标签</button>
-                        <button class="stats-view-btn" data-stats-view="status">按状态</button>
-                        <button class="stats-view-btn" data-stats-view="group">按组合</button>
-                        <button class="stats-view-btn" data-stats-view="month">按月份</button>
+                    <div class="stats-view-tabs" id="statsViewTabs" role="tablist" aria-label="统计视图">
+                        <button class="stats-view-btn active" data-stats-view="tag" role="tab" aria-selected="true">按标签</button>
+                        <button class="stats-view-btn" data-stats-view="status" role="tab" aria-selected="false">按状态</button>
+                        <button class="stats-view-btn" data-stats-view="group" role="tab" aria-selected="false">按组合</button>
+                        <button class="stats-view-btn" data-stats-view="month" role="tab" aria-selected="false">按月份</button>
                     </div>
                 </section>
 
@@ -130,21 +139,21 @@
                                 <div class="stat-value-medium">¥<span id="globalTotalPrice">0.00</span></div>
                             </div>
                         </div>
-                        <div class="stats-badges">
+                        <div class="stats-badges" role="group" aria-label="资产状态统计">
                             <div class="stat-badge">
-                                <span class="badge-num" id="statTotal">0</span>
+                                <span class="badge-num" id="statTotal" aria-label="总记录数">0</span>
                                 <span class="badge-label">总记录</span>
                             </div>
                             <div class="stat-badge active">
-                                <span class="badge-num" id="statActive">0</span>
+                                <span class="badge-num" id="statActive" aria-label="使用中数量">0</span>
                                 <span class="badge-label">使用中</span>
                             </div>
                             <div class="stat-badge broken">
-                                <span class="badge-num" id="statBroken">0</span>
+                                <span class="badge-num" id="statBroken" aria-label="已损坏数量">0</span>
                                 <span class="badge-label">已损坏</span>
                             </div>
                             <div class="stat-badge sold">
-                                <span class="badge-num" id="statSold">0</span>
+                                <span class="badge-num" id="statSold" aria-label="已回血数量">0</span>
                                 <span class="badge-label">已回血</span>
                             </div>
                         </div>
@@ -157,15 +166,23 @@
                     </div>
                 </div>
 
-                <div class="card glass stats-chart-card trend-card">
-                    <canvas id="trendChart"></canvas>
-                    <h3 class="chart-caption">价值摊销趋势</h3>
-                </div>
+                <!-- Progressive Disclosure Toggle -->
+                <button id="statsToggleDetails" class="stats-toggle-btn" aria-expanded="false" aria-controls="statsDetailSection">
+                    <span class="toggle-arrow">▼</span> 展开详细统计
+                </button>
 
-                <div class="card glass stats-chart-card tag-card">
-                    <h3 id="statsBreakdownTitle">标签日均成本分布</h3>
-                    <div id="tagStatsContainer" class="tag-stats-container stats-breakdown-list">
-                        <div class="empty-state">暂无标签数据。给物品添加标签后会在这里汇总。</div>
+                <!-- Collapsible detail section -->
+                <div id="statsDetailSection" class="stats-detail-section collapsed" role="region" aria-label="详细统计分析">
+                    <div class="card glass stats-chart-card trend-card">
+                        <canvas id="trendChart"></canvas>
+                        <h3 class="chart-caption">价值摊销趋势</h3>
+                    </div>
+
+                    <div class="card glass stats-chart-card tag-card">
+                        <h3 id="statsBreakdownTitle">标签日均成本分布</h3>
+                        <div id="tagStatsContainer" class="tag-stats-container stats-breakdown-list">
+                            <div class="empty-state">暂无标签数据。给物品添加标签后会在这里汇总。</div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -187,7 +204,7 @@
                     <aside class="totp-sidebar glass">
                         <div class="totp-sidebar-header">
                             <span>分组</span>
-                            <button class="btn-icon" id="totpAddGroupBtn" title="新建分组">➕</button>
+                            <button class="btn-icon" id="totpAddGroupBtn" title="新建分组" aria-label="新建分组">➕</button>
                         </div>
                         <div id="totpGroupList" class="totp-group-list"></div>
                     </aside>
@@ -206,9 +223,9 @@
         </div>
 
         <!-- TOTP Add Key Modal -->
-        <div id="totpAddKeyModal" class="modal-overlay hidden">
+        <div id="totpAddKeyModal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="totpAddKeyModalTitle">
             <div class="modal-content glass">
-                <button class="modal-close" id="totpAddKeyModalClose">&times;</button>
+                <button class="modal-close" id="totpAddKeyModalClose" aria-label="关闭">&times;</button>
                 <h2>添加密钥</h2>
                 <form id="totpAddForm" class="structured-form">
                     <div class="form-row">
@@ -240,9 +257,9 @@
         </div>
 
 <!-- TOTP Import Preview Modal -->
-        <div id="totpImportModal" class="modal-overlay hidden">
+        <div id="totpImportModal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-label="导入预览">
             <div class="modal-content glass small-modal">
-                <button class="modal-close" id="totpImportModalClose">&times;</button>
+                <button class="modal-close" id="totpImportModalClose" aria-label="关闭">&times;</button>
                 <h2>导入预览</h2>
                 <p id="totpImportSummary" class="modal-message"></p>
                 <div id="totpImportPreview" class="totp-import-preview"></div>
@@ -254,9 +271,9 @@
         </div>
 
         <!-- TOTP Group Prompt Modal -->
-        <div id="totpGroupModal" class="modal-overlay hidden">
+        <div id="totpGroupModal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="totpGroupModalTitle">
             <div class="modal-content glass small-modal">
-                <button class="modal-close" id="totpGroupModalClose">&times;</button>
+                <button class="modal-close" id="totpGroupModalClose" aria-label="关闭">&times;</button>
                 <h2 id="totpGroupModalTitle">新建分组</h2>
                 <div class="form-group" id="totpGroupModalInputWrap">
                     <label for="totpGroupModalInput" id="totpGroupModalInputLabel">分组名称</label>
@@ -275,9 +292,9 @@
         </div>
 
         <!-- TOTP QR Scan Modal -->
-        <div id="totpScanModal" class="modal-overlay hidden">
+        <div id="totpScanModal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-label="扫码添加密钥">
             <div class="modal-content glass">
-                <button class="modal-close" id="totpScanModalClose">&times;</button>
+                <button class="modal-close" id="totpScanModalClose" aria-label="关闭">&times;</button>
                 <h2>扫码添加密钥</h2>
                 <div class="totp-scan-container">
                     <video id="totpScanVideo" autoplay playsinline></video>
@@ -400,9 +417,9 @@
         </div>
     </div>
 
-    <div id="resultModal" class="modal-overlay hidden">
+    <div id="resultModal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="modalResultTitle">
         <div class="modal-content glass">
-            <button class="modal-close" id="modalCloseBtn">&times;</button>
+            <button class="modal-close" id="modalCloseBtn" aria-label="关闭">&times;</button>
             <h2 id="modalResultTitle">日均成本</h2>
             <div class="cost-display">
                 <span class="currency">¥</span>
@@ -417,9 +434,9 @@
         </div>
     </div>
 
-    <div id="statusModal" class="modal-overlay hidden">
+    <div id="statusModal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-label="编辑物品">
         <div class="modal-content glass form-modal">
-            <button class="modal-close" id="statusModalCloseBtn">&times;</button>
+            <button class="modal-close" id="statusModalCloseBtn" aria-label="关闭">&times;</button>
             <h2>编辑物品</h2>
 
             <form id="statusForm" class="structured-form">
@@ -508,9 +525,9 @@
 
     <div id="globalTooltip" class="tooltip"></div>
 
-    <div id="passwordModal" class="modal-overlay hidden">
+    <div id="passwordModal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-label="修改密码">
         <div class="modal-content glass small-modal">
-            <button class="modal-close" id="passwordModalCloseBtn">&times;</button>
+            <button class="modal-close" id="passwordModalCloseBtn" aria-label="关闭">&times;</button>
             <h2>修改密码</h2>
             <form id="passwordForm" class="structured-form">
                 <div id="passwordError" class="error-msg hidden"></div>
@@ -531,9 +548,9 @@
         </div>
     </div>
 
-    <div id="editProfileModal" class="modal-overlay hidden">
+    <div id="editProfileModal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-label="编辑个人资料">
         <div class="modal-content glass small-modal">
-            <button class="modal-close" id="editProfileCloseBtn">&times;</button>
+            <button class="modal-close" id="editProfileCloseBtn" aria-label="关闭">&times;</button>
             <h2>编辑个人资料</h2>
             <form id="editProfileForm" class="structured-form">
                 <div id="editProfileError" class="error-msg hidden"></div>
@@ -562,7 +579,7 @@
         </div>
     </div>
 
-    <div id="customConfirmModal" class="modal-overlay hidden">
+    <div id="customConfirmModal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="confirmTitle">
         <div class="modal-content glass small-modal center-modal">
             <h2 id="confirmTitle">确认操作</h2>
             <p id="confirmMessage" class="modal-message"></p>
@@ -573,7 +590,7 @@
         </div>
     </div>
 
-    <div id="customChoiceModal" class="modal-overlay hidden">
+    <div id="customChoiceModal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="choiceTitle">
         <div class="modal-content glass small-modal center-modal">
             <h2 id="choiceTitle">级联处理</h2>
             <p id="choiceMessage" class="modal-message left"></p>
@@ -585,7 +602,7 @@
         </div>
     </div>
 
-    <div id="customAlertModal" class="modal-overlay hidden">
+    <div id="customAlertModal" class="modal-overlay hidden" role="alertdialog" aria-modal="true" aria-labelledby="alertTitle">
         <div class="modal-content glass small-modal center-modal">
             <div id="alertIcon" class="alert-icon">!</div>
             <h2 id="alertTitle">提示</h2>
@@ -594,7 +611,7 @@
         </div>
     </div>
 
-    <div id="importChoiceModal" class="modal-overlay hidden">
+    <div id="importChoiceModal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-label="导入数据方式">
         <div class="modal-content glass small-modal center-modal">
             <h2>导入数据方式</h2>
             <p class="modal-message left">请选择如何处理当前系统中已有的数据。</p>
@@ -612,9 +629,9 @@
         </div>
     </div>
 
-    <div id="addItemModal" class="modal-overlay hidden">
+    <div id="addItemModal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-label="添加物品">
         <div class="modal-content glass form-modal">
-            <button class="modal-close" id="addItemModalClose">&times;</button>
+            <button class="modal-close" id="addItemModalClose" aria-label="关闭">&times;</button>
             <h2>添加物品</h2>
             <form id="costForm" class="structured-form">
                 <section class="form-section">
@@ -698,9 +715,9 @@
         </div>
     </div>
 
-    <div id="depreciationInfoModal" class="modal-overlay hidden">
+    <div id="depreciationInfoModal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-label="折旧算法说明">
         <div class="modal-content glass info-modal">
-            <button class="modal-close" id="depreciationInfoModalClose">&times;</button>
+            <button class="modal-close" id="depreciationInfoModalClose" aria-label="关闭">&times;</button>
             <h2>折旧算法说明</h2>
             <section class="info-section">
                 <h3>直线折旧法</h3>
@@ -723,6 +740,11 @@
     <script src="/chart.min.js"></script>
     <script src="jsQR.min.js"></script>
     <script src="js/mobile-swipe.js?v=1"></script>
+    <script src="js/toast.js?v=2"></script>
+    <script src="js/state-manager.js?v=1"></script>
+    <script src="js/quick-add.js?v=1"></script>
+    <script src="js/inline-editor.js?v=1"></script>
+    <script src="js/batch-manager.js?v=1"></script>
     <script src="js/totp.js?v=1"></script>
     <script src="settings.js?v=1"></script>
     <script src="script.js?v=11"></script>

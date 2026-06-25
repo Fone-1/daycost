@@ -26,7 +26,9 @@ RUN mkdir -p /data
 ENV NODE_ENV=production
 ENV PORT=80
 ENV DB_PATH=/data/data.db
-ENV JWT_SECRET=change_this_to_something_secure_in_azure_portal
+# SECURITY: JWT_SECRET must be set via environment variable or Docker secrets at runtime
+# Do NOT set a default value here - the app will fail to start if not configured
+# ENV JWT_SECRET=
 
 # Expose port 80
 EXPOSE 80

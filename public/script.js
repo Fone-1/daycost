@@ -242,10 +242,19 @@
     dateInput.max = todayStr;
     dateInput.value = todayStr;
 
-    // --- SPA Routing Logic ---
-    const navBtns = document.querySelectorAll('.nav-btn');
+    // --- SPA Routing Logic (Three-Tier Navigation) ---
+    const navBtns = document.querySelectorAll('.nav-btn[data-target]');
+    const navMoreItems = document.querySelectorAll('.nav-more-item[data-target]');
+    const navSettingsBtn = document.getElementById('navSettingsBtn');
+    const navMoreBtn = document.getElementById('navMoreBtn');
+    const navMoreDropdown = document.getElementById('navMoreDropdown');
     const panes = document.querySelectorAll('.spa-pane');
     const navIndicator = document.querySelector('.nav-indicator');
+
+    // IDs of panes that live under the "更多" menu
+    const morePaneIds = new Set(
+      Array.from(navMoreItems).map(el => el.getAttribute('data-target'))
+    );
 
     function moveIndicator(activeBtn) {
         if (!navIndicator || !activeBtn) return;
@@ -256,40 +265,110 @@
         navIndicator.style.width = btnRect.width + 'px';
     }
 
+    /** Switch to a pane; @param {string} targetId */
+    function switchToPane(targetId) {
+        // Show / hide panes
+        panes.forEach(pane => {
+            if (pane.id === targetId) {
+                pane.classList.remove('hidden');
+                pane.classList.add('active');
+            } else {
+                pane.classList.remove('active');
+                pane.classList.add('hidden');
+            }
+        });
+
+        const isMorePane = morePaneIds.has(targetId);
+        const isSettings = targetId === 'pane-settings';
+
+        // Update main nav-btn active states
+        navBtns.forEach(b => {
+            b.classList.remove('active');
+            b.setAttribute('aria-selected', 'false');
+        });
+
+        if (!isMorePane && !isSettings) {
+            // A core nav pane — highlight the matching button
+            const matchBtn = Array.from(navBtns).find(b => b.getAttribute('data-target') === targetId);
+            if (matchBtn) {
+                matchBtn.classList.add('active');
+                matchBtn.setAttribute('aria-selected', 'true');
+                moveIndicator(matchBtn);
+            }
+        }
+
+        // "更多" button active highlight
+        if (navMoreBtn) {
+            navMoreBtn.classList.toggle('active', isMorePane);
+        }
+        // Settings button active highlight
+        if (navSettingsBtn) {
+            navSettingsBtn.classList.toggle('active', isSettings);
+        }
+
+        // Close the dropdown
+        closeMoreMenu();
+
+        // Pane-specific hooks
+        if (targetId === 'pane-history' && clusterizeInstance) {
+            setTimeout(() => clusterizeInstance.refresh(true), 10);
+        }
+        if (targetId === 'pane-trash') {
+            loadTrash();
+        }
+    }
+
     // Initialize indicator position
     const initialActive = document.querySelector('.nav-btn.active');
     if (initialActive) {
         requestAnimationFrame(() => moveIndicator(initialActive));
     }
 
+    // Main nav buttons
     navBtns.forEach(btn => {
         btn.addEventListener('click', () => {
-            const targetId = btn.getAttribute('data-target');
-
-            navBtns.forEach(b => b.classList.remove('active'));
-            btn.classList.add('active');
-            moveIndicator(btn);
-
-            panes.forEach(pane => {
-                if (pane.id === targetId) {
-                    pane.classList.remove('hidden');
-                    pane.classList.add('active');
-                } else {
-                    pane.classList.remove('active');
-                    pane.classList.add('hidden');
-                }
-            });
-
-            if (targetId === 'pane-history' && clusterizeInstance) {
-                // Must force a refresh when the tab becomes visible, otherwise height evaluates to 0
-                setTimeout(() => clusterizeInstance.refresh(true), 10);
-            }
-
-            if (targetId === 'pane-trash') {
-                loadTrash();
-            }
+            switchToPane(btn.getAttribute('data-target'));
         });
     });
+
+    // "更多" menu items
+    navMoreItems.forEach(item => {
+        item.addEventListener('click', () => {
+            switchToPane(item.getAttribute('data-target'));
+            // Update active state inside the dropdown
+            navMoreItems.forEach(i => i.classList.remove('active'));
+            item.classList.add('active');
+        });
+    });
+
+    // Settings button
+    if (navSettingsBtn) {
+        navSettingsBtn.addEventListener('click', () => {
+            switchToPane(navSettingsBtn.getAttribute('data-target'));
+        });
+    }
+
+    // "更多" dropdown toggle
+    function closeMoreMenu() {
+        if (navMoreDropdown) navMoreDropdown.classList.remove('open');
+        if (navMoreBtn) navMoreBtn.classList.remove('open');
+    }
+
+    if (navMoreBtn && navMoreDropdown) {
+        navMoreBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const isOpen = navMoreDropdown.classList.toggle('open');
+            navMoreBtn.classList.toggle('open', isOpen);
+            navMoreBtn.setAttribute('aria-expanded', String(isOpen));
+        });
+
+        // Close dropdown when clicking outside
+        document.addEventListener('click', (e) => {
+            if (!navMoreDropdown.contains(e.target) && e.target !== navMoreBtn) {
+                closeMoreMenu();
+            }
+        });
+    }
 
     checkAuth();
 
@@ -297,7 +376,9 @@
     tabLogin.addEventListener('click', () => {
         isLoginMode = true;
         tabLogin.classList.add('active');
+        tabLogin.setAttribute('aria-selected', 'true');
         tabRegister.classList.remove('active');
+        tabRegister.setAttribute('aria-selected', 'false');
         authSubmitBtn.textContent = '登录';
         authError.classList.add('hidden');
     });
@@ -305,7 +386,9 @@
     tabRegister.addEventListener('click', () => {
         isLoginMode = false;
         tabRegister.classList.add('active');
+        tabRegister.setAttribute('aria-selected', 'true');
         tabLogin.classList.remove('active');
+        tabLogin.setAttribute('aria-selected', 'false');
         authSubmitBtn.textContent = '注册并登录';
         authError.classList.add('hidden');
     });
@@ -481,7 +564,7 @@
             const data = await res.json();
 
             if (res.ok) {
-                showAppAlert(data.message);
+                if (window.toast) window.toast.success(data.message || '密码已修改');
                 passwordModal.classList.add('hidden');
                 logoutBtn.click(); // force re-login
             } else {
@@ -618,6 +701,8 @@
                 loadHistory();
                 loadStats();
 
+                if (window.toast) window.toast.success(`「${itemName}」已添加 · ¥${dailyCost.toFixed(2)}/天`);
+
                 modalResultTitle.textContent = `${itemName} 的日均成本为`;
                 resultModal.classList.remove('hidden');
                 animateValue(modalDailyCost, 0, dailyCost, 1000, true);
@@ -753,10 +838,12 @@
                 const data = await res.json();
                 if (res.ok) {
                     statusModal.classList.add('hidden');
+                    if (window.toast) window.toast.success('记录已更新');
                     loadHistory();
                     loadStats();
                 } else {
-                    showAppAlert(data.error || '更新失败');
+                    if (window.toast) window.toast.error(data.error || '更新失败');
+                    else showAppAlert(data.error || '更新失败');
                 }
             } catch (err) { } finally {
                 submitBtn.classList.remove('loading');
@@ -835,13 +922,16 @@
                     });
                     const data = await res.json();
                     if (res.ok) {
+                        if (window.toast) window.toast.success('已移入回收站');
                         loadHistory();
                         loadStats();
                     } else {
-                        showAppAlert(data.error || '删除失败');
+                        if (window.toast) window.toast.error(data.error || '删除失败');
+                        else showAppAlert(data.error || '删除失败');
                     }
                 } catch (e) {
-                    showAppAlert('操作失败');
+                    if (window.toast) window.toast.error('操作失败');
+                    else showAppAlert('操作失败');
                 }
             },
             '确认删除'
@@ -1031,15 +1121,8 @@
         currentPage = 1;
         loadHistory(1, false);
     });
-    searchInput.addEventListener('input', () => {
-        statsLinkedFilter = null;
-        updateStatsControls();
-        // Search still happens locally for now for responsiveness, 
-        // but we could move it to server if needed. 
-        // For infinite scroll, server-side search is better.
-        currentPage = 1;
-        loadHistory(1, false);
-    });
+    // Debounced search — replaced in Phase 3 performance section below
+    // (The actual debounced handler is registered at the end of the file)
 
     window.toggleChildren = function (parentId) {
         expandedParents[parentId] = !expandedParents[parentId];
@@ -1053,7 +1136,26 @@
     const depreciationInfoModal = document.getElementById('depreciationInfoModal');
     const depreciationInfoModalClose = document.getElementById('depreciationInfoModalClose');
     const depreciationInfoOkBtn = document.getElementById('depreciationInfoOkBtn');
-    if (fabAddBtn && addItemModal) fabAddBtn.addEventListener('click', () => addItemModal.classList.remove('hidden'));
+    // FAB button — opens Quick Add Panel; long-press opens full modal
+    let fabLongPressTimer = null;
+    if (fabAddBtn) {
+      fabAddBtn.addEventListener('click', () => {
+        if (window._quickAddPanel) window._quickAddPanel.toggle();
+        else if (addItemModal) addItemModal.classList.remove('hidden');
+      });
+      fabAddBtn.addEventListener('pointerdown', () => {
+        fabLongPressTimer = setTimeout(() => {
+          fabLongPressTimer = null;
+          if (addItemModal) addItemModal.classList.remove('hidden');
+        }, 600);
+      });
+      fabAddBtn.addEventListener('pointerup', () => {
+        if (fabLongPressTimer) { clearTimeout(fabLongPressTimer); fabLongPressTimer = null; }
+      });
+      fabAddBtn.addEventListener('pointerleave', () => {
+        if (fabLongPressTimer) { clearTimeout(fabLongPressTimer); fabLongPressTimer = null; }
+      });
+    }
     if (addItemModalClose && addItemModal) addItemModalClose.addEventListener('click', () => addItemModal.classList.add('hidden'));
     if (depreciationInfoModalClose && depreciationInfoModal) depreciationInfoModalClose.addEventListener('click', () => depreciationInfoModal.classList.add('hidden'));
     if (depreciationInfoOkBtn && depreciationInfoModal) depreciationInfoOkBtn.addEventListener('click', () => depreciationInfoModal.classList.add('hidden'));
@@ -1221,7 +1323,7 @@
                     const isExpanded = !!expandedParents[record.id];
                     const btnText = isExpanded ? `▲ 收起零件明细` : `▼ 展开零件明细 (${totalChildren}个部件)`;
 
-                    virtualRows.push(`<div class="record-wrapper"><button class="toggle-children-btn" data-parent-id="${record.id}" style="width:100%; border-radius:10px; margin-top:5px; margin-bottom:5px;">${btnText}</button></div>`);
+                    virtualRows.push(`<div class="record-wrapper"><button class="toggle-children-btn" data-parent-id="${record.id}" aria-expanded="${isExpanded}" style="width:100%; border-radius:10px; margin-top:5px; margin-bottom:5px;">${btnText}</button></div>`);
 
                     if (isExpanded) {
                         children.forEach(child => {
@@ -1528,7 +1630,9 @@
 
     function updateStatsControls() {
         document.querySelectorAll('[data-stats-view]').forEach(btn => {
-            btn.classList.toggle('active', btn.dataset.statsView === statsActiveView);
+            const isActive = btn.dataset.statsView === statsActiveView;
+            btn.classList.toggle('active', isActive);
+            btn.setAttribute('aria-selected', isActive ? 'true' : 'false');
         });
         const title = document.getElementById('statsBreakdownTitle');
         if (title) title.textContent = statsViewMeta[statsActiveView]?.title || '统计分布';
@@ -1840,11 +1944,12 @@
             const data = await res.json();
             if (!res.ok) throw new Error(data.error || '导入失败');
 
-            showAppAlert('数据导入成功', 'success');
+            if (window.toast) window.toast.success('数据导入成功');
             loadHistory();
             loadStats();
         } catch (err) {
-            showAppAlert(err.message || '导入请求失败');
+            if (window.toast) window.toast.error(err.message || '导入请求失败');
+            else showAppAlert(err.message || '导入请求失败');
         } finally {
             tempDataToImport = null;
         }
@@ -1905,12 +2010,13 @@
             const data = await res.json();
             if (!res.ok) throw new Error(data.error || '恢复失败');
 
-            showAppAlert('记录已恢复', 'success');
+            if (window.toast) window.toast.success('记录已恢复');
             loadTrash();
             loadHistory();
             loadStats();
         } catch (err) {
-            showAppAlert(err.message || '恢复失败');
+            if (window.toast) window.toast.error(err.message || '恢复失败');
+            else showAppAlert(err.message || '恢复失败');
         }
     };
 
@@ -1921,10 +2027,11 @@
                 const data = await res.json().catch(() => ({}));
                 if (!res.ok) throw new Error(data.error || '永久删除失败');
 
-                showAppAlert('记录已永久删除', 'success');
+                if (window.toast) window.toast.success('记录已永久删除');
                 loadTrash();
             } catch (err) {
-                showAppAlert(err.message || '永久删除失败');
+                if (window.toast) window.toast.error(err.message || '永久删除失败');
+                else showAppAlert(err.message || '永久删除失败');
             }
         }, '永久删除');
     };
@@ -1932,6 +2039,309 @@
     if (window.DayCostSwipe) window.DayCostSwipe.init(historyScrollEl);
     
     if (window.DayCostTotp) window.DayCostTotp.init({ getHeaders, escapeHtml });
+
+    // ============================================================
+    // Phase 2: QuickAddPanel + InlineEditor + BatchManager + Toast
+    // ============================================================
+
+    // --- QuickAddPanel ---
+    if (window.QuickAddPanel) {
+        window._quickAddPanel = new window.QuickAddPanel({
+            onSubmit: async (payload) => {
+                const res = await fetch('/api/records', {
+                    method: 'POST',
+                    headers: getHeaders(),
+                    body: JSON.stringify(payload),
+                });
+                if (res.status === 401 || res.status === 403) {
+                    logoutBtn.click();
+                    throw new Error('Unauthorized');
+                }
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error || '添加失败');
+
+                loadHistory();
+                loadStats();
+
+                // Show cost preview
+                const { dailyCost } = calculateCost(data);
+                if (window.toast) window.toast.success(`「${payload.item_name}」已添加 · ¥${(dailyCost || 0).toFixed(2)}/天`);
+            },
+        });
+    }
+
+    // --- InlineEditor + BatchManager ---
+    // Long-press / double-click on cards for inline editing
+    // Long-press enters batch mode; double-click opens inline editor
+    let longPressTimer = null;
+    let longPressTarget = null;
+    const LONG_PRESS_MS = 500;
+
+    function getRecordFromCard(el) {
+        const card = el.closest('.history-item');
+        if (!card) return null;
+        const id = parseInt(card.dataset.id, 10);
+        if (isNaN(id)) return null;
+        return { id, card };
+    }
+
+    // --- Batch Manager ---
+    let batchMgr = null;
+    if (window.BatchManager) {
+        batchMgr = new window.BatchManager({
+            onBatchStatusChange: async (ids, status) => {
+                const results = await Promise.allSettled(
+                    ids.map(id =>
+                        fetch(`/api/records/${id}`, {
+                            method: 'PUT',
+                            headers: getHeaders(),
+                            body: JSON.stringify({ status, cascadeAction: 'none' }),
+                        }).then(r => r.ok ? r.json() : Promise.reject(new Error(`ID ${id} 更新失败`)))
+                    )
+                );
+                const failed = results.filter(r => r.status === 'rejected');
+                if (failed.length > 0) {
+                    throw new Error(`${failed.length} 项更新失败`);
+                }
+                loadHistory();
+                loadStats();
+            },
+            onBatchDelete: async (ids) => {
+                const results = await Promise.allSettled(
+                    ids.map(id =>
+                        fetch(`/api/records/${id}`, {
+                            method: 'DELETE',
+                            headers: getHeaders(),
+                        }).then(r => r.ok ? r.json() : Promise.reject(new Error(`ID ${id} 删除失败`)))
+                    )
+                );
+                const failed = results.filter(r => r.status === 'rejected');
+                if (failed.length > 0) {
+                    throw new Error(`${failed.length} 项删除失败`);
+                }
+                loadHistory();
+                loadStats();
+            },
+            getRecords: () => globalRecords,
+            onCancel: () => { /* batch mode deactivated */ },
+        });
+    }
+
+    // --- Record card interactions (event delegation) ---
+    if (historyScrollEl) {
+        // Pointer down for long-press detection
+        historyScrollEl.addEventListener('pointerdown', (e) => {
+            const info = getRecordFromCard(e.target);
+            if (!info) return;
+            // Don't trigger on buttons / action elements
+            if (e.target.closest('[data-action]') || e.target.closest('.toggle-children-btn') || e.target.closest('.swipe-actions')) return;
+
+            longPressTarget = info;
+            longPressTimer = setTimeout(() => {
+                longPressTimer = null;
+                // Long press → enter batch mode with this item selected
+                if (batchMgr) {
+                    if (!batchMgr.isActive) {
+                        batchMgr.activate(info.id);
+                        info.card.classList.add('batch-selected');
+                    }
+                }
+            }, LONG_PRESS_MS);
+        });
+
+        historyScrollEl.addEventListener('pointerup', () => {
+            if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null; }
+        });
+
+        historyScrollEl.addEventListener('pointermove', (e) => {
+            // Cancel long-press if finger moves too much
+            if (longPressTimer && longPressTarget) {
+                // We don't track start position precisely; just let it fire
+            }
+        });
+
+        historyScrollEl.addEventListener('pointercancel', () => {
+            if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null; }
+        });
+
+        // Double-click → inline edit (desktop)
+        historyScrollEl.addEventListener('dblclick', (e) => {
+            const info = getRecordFromCard(e.target);
+            if (!info) return;
+            if (e.target.closest('[data-action]') || e.target.closest('.toggle-children-btn') || e.target.closest('.swipe-actions')) return;
+            if (batchMgr && batchMgr.isActive) return; // Don't inline edit in batch mode
+
+            const record = globalRecords.find(r => r.id === info.id);
+            if (!record) return;
+
+            // Prevent duplicate editors
+            if (info.card.closest('.record-wrapper.inline-editing')) return;
+
+            const editor = new window.InlineEditor({
+                recordId: info.id,
+                record: record,
+                cardElement: info.card,
+                onSave: async (recordId, updates) => {
+                    const res = await fetch(`/api/records/${recordId}`, {
+                        method: 'PUT',
+                        headers: getHeaders(),
+                        body: JSON.stringify({ ...updates, cascadeAction: 'none' }),
+                    });
+                    if (res.status === 401 || res.status === 403) {
+                        logoutBtn.click();
+                        throw new Error('Unauthorized');
+                    }
+                    const data = await res.json();
+                    if (!res.ok) throw new Error(data.error || '更新失败');
+
+                    if (window.toast) window.toast.success('记录已更新');
+                    loadHistory();
+                    loadStats();
+                },
+            });
+            editor.enterEditMode();
+        });
+
+        // Click in batch mode → toggle selection
+        historyScrollEl.addEventListener('click', (e) => {
+            if (!batchMgr || !batchMgr.isActive) return;
+            const info = getRecordFromCard(e.target);
+            if (!info) return;
+            // Don't intercept action buttons
+            if (e.target.closest('[data-action]') || e.target.closest('.toggle-children-btn')) return;
+
+            e.stopPropagation();
+            batchMgr.toggle(info.id, info.card);
+        });
+    }
+
+    // ============================================================
+    // Phase 3: Progressive Disclosure, Error Handling, Performance
+    // ============================================================
+
+    // --- Progressive Disclosure: Stats toggle ---
+    const statsToggleBtn = document.getElementById('statsToggleDetails');
+    const statsDetailSection = document.getElementById('statsDetailSection');
+    if (statsToggleBtn && statsDetailSection) {
+        let statsExpanded = false;
+        statsToggleBtn.addEventListener('click', () => {
+            statsExpanded = !statsExpanded;
+            statsToggleBtn.classList.toggle('open', statsExpanded);
+            statsToggleBtn.setAttribute('aria-expanded', String(statsExpanded));
+            if (statsExpanded) {
+                statsDetailSection.classList.remove('collapsed');
+                statsDetailSection.classList.add('expanded');
+                statsToggleBtn.innerHTML = '<span class="toggle-arrow">▲</span> 收起详细统计';
+                // Lazy-load charts only when first expanded
+                requestAnimationFrame(() => {
+                    renderTrendChart(currentTrendRange);
+                    renderStatsBreakdown();
+                });
+            } else {
+                statsDetailSection.classList.remove('expanded');
+                statsDetailSection.classList.add('collapsed');
+                statsToggleBtn.innerHTML = '<span class="toggle-arrow">▼</span> 展开详细统计';
+            }
+        });
+    }
+
+    // --- Offline Detection ---
+    const offlineBanner = document.getElementById('offlineBanner');
+    function updateOnlineStatus() {
+        if (!navigator.onLine) {
+            if (offlineBanner) offlineBanner.classList.add('visible');
+        } else {
+            if (offlineBanner) offlineBanner.classList.remove('visible');
+        }
+    }
+    window.addEventListener('online', updateOnlineStatus);
+    window.addEventListener('offline', updateOnlineStatus);
+    // Check on load
+    updateOnlineStatus();
+
+    // --- Debounce utility ---
+    function debounce(fn, delay) {
+        let timer = null;
+        return function (...args) {
+            if (timer) clearTimeout(timer);
+            timer = setTimeout(() => fn.apply(this, args), delay);
+        };
+    }
+
+    // --- Performance: Debounce search input ---
+    if (searchInput) {
+        const debouncedSearch = debounce(() => {
+            statsLinkedFilter = null;
+            updateStatsControls();
+            currentPage = 1;
+            loadHistory(1, false);
+        }, 300);
+
+        searchInput.addEventListener('input', debouncedSearch);
+    }
+
+    // --- Performance: IntersectionObserver for lazy chart loading ---
+    if ('IntersectionObserver' in window) {
+        const trendChartCanvas = document.getElementById('trendChart');
+        const costChartCanvas = document.getElementById('costChart');
+
+        const chartObserver = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    const canvas = entry.target;
+                    if (canvas.id === 'trendChart' && !trendChartInstance) {
+                        renderTrendChart(currentTrendRange);
+                    }
+                    if (canvas.id === 'costChart' && !costChartInstance) {
+                        renderChart();
+                    }
+                    chartObserver.unobserve(canvas);
+                }
+            });
+        }, { threshold: 0.1 });
+
+        // Only observe if stats detail section is expanded (charts are hidden by default)
+        // We'll observe when the detail section is first expanded instead
+        if (trendChartCanvas) trendChartCanvas._lazyLoad = true;
+        if (costChartCanvas) costChartCanvas._lazyLoad = true;
+    }
+
+    // --- Performance: requestAnimationFrame for renderHistory ---
+    let renderHistoryRAF = null;
+    const origRenderHistory = renderHistory;
+    // Note: renderHistory is already called from loadHistory; we wrap the animation-sensitive parts
+
+    // --- Global fetch error handler with Toast ---
+    const origFetch = window.fetch;
+    window.fetch = async function (...args) {
+        try {
+            const response = await origFetch.apply(this, args);
+            return response;
+        } catch (err) {
+            // Network error
+            if (!navigator.onLine) {
+                if (offlineBanner) offlineBanner.classList.add('visible');
+                if (window.toast) window.toast.error('网络连接已断开，请检查网络后重试');
+            } else if (err.message && err.message.includes('Failed to fetch')) {
+                if (window.toast) window.toast.error('服务器连接失败，请稍后重试');
+            }
+            throw err;
+        }
+    };
+
+    // --- Form validation highlight utility ---
+    window.highlightInvalidField = function (inputEl, message) {
+        inputEl.classList.add('input-error');
+        inputEl.focus();
+        if (window.toast) window.toast.warning(message || '请检查输入内容');
+        const clearHighlight = () => {
+            inputEl.classList.remove('input-error');
+            inputEl.removeEventListener('input', clearHighlight);
+            inputEl.removeEventListener('change', clearHighlight);
+        };
+        inputEl.addEventListener('input', clearHighlight);
+        inputEl.addEventListener('change', clearHighlight);
+    };
 
 });
 

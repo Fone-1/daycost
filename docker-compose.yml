@@ -8,8 +8,15 @@ services:
       - "4567:80"
     environment:
       - PORT=80
-      - JWT_SECRET=PLEASE_CHANGE_THIS_SECRET_IN_PRODUCTION
+      # SECURITY: JWT_SECRET must be set in .env file or Docker secrets
+      # Generate with: openssl rand -hex 32
+      - JWT_SECRET=${JWT_SECRET}
+      # SECURITY: TOTP_KEY must be set independently from JWT_SECRET
+      # Generate with: openssl rand -hex 16 (produces exactly 32 UTF-8 bytes)
+      - TOTP_KEY=${TOTP_KEY}
       - DB_PATH=/data/data.db
+    env_file:
+      - .env  # Load secrets from .env file (create this file with your secrets)
     volumes:
       # 1. 挂载持久化数据库结构
       - ./data:/data

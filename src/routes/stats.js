@@ -5,6 +5,43 @@ const { getFilteredTreeRecords } = require('../utils/treeHelper');
 
 const router = express.Router();
 
+/**
+ * Simulate the daily cost of a record at a specific target date.
+ * Used for trend chart calculations. (S5: extracted to file top-level)
+ *
+ * @param {Object} record - The record object with price, purchase_date, status, etc.
+ * @param {Date} targetDate - The date to simulate cost at
+ * @returns {number} The daily cost at the given date
+ */
+function simulateCostAtDate(record, targetDate) {
+    const purchaseDate = new Date(record.purchase_date);
+    purchaseDate.setHours(0, 0, 0, 0);
+
+    if (targetDate < purchaseDate) return 0;
+
+    let endDate = new Date(targetDate.getTime());
+    const status = record.status || 'active';
+    let finalCost = record.price;
+
+    if (status !== 'active' && record.end_date) {
+        const itemEndDate = new Date(record.end_date);
+        itemEndDate.setHours(0, 0, 0, 0);
+
+        if (targetDate >= itemEndDate) {
+            endDate = itemEndDate;
+            if (status === 'sold') {
+                finalCost = Math.max(0, record.price - (record.resale_price || 0));
+            }
+        }
+    }
+
+    const timeDiff = Math.max(0, endDate.getTime() - purchaseDate.getTime());
+    const daysUsed = Math.floor(timeDiff / (1000 * 3600 * 24));
+    const actualDaysForCalc = daysUsed + 1;
+
+    return finalCost / actualDaysForCalc;
+}
+
 router.get('/', authenticateToken, async (req, res) => {
     try {
         const { filteredTopLevel, allMatchedRecords } = await getFilteredTreeRecords(req.user.id, req.query, db);
@@ -100,35 +137,6 @@ router.get('/trend', authenticateToken, async (req, res) => {
         console.error("API Trend Error:", err);
         res.status(500).json({ error: '获取趋势数据失败' });
     }
-
-    function simulateCostAtDate(record, targetDate) {
-        const purchaseDate = new Date(record.purchase_date);
-        purchaseDate.setHours(0, 0, 0, 0);
-
-        if (targetDate < purchaseDate) return 0;
-
-        let endDate = new Date(targetDate.getTime());
-        const status = record.status || 'active';
-        let finalCost = record.price;
-
-        if (status !== 'active' && record.end_date) {
-            const itemEndDate = new Date(record.end_date);
-            itemEndDate.setHours(0, 0, 0, 0);
-
-            if (targetDate >= itemEndDate) {
-                endDate = itemEndDate;
-                if (status === 'sold') {
-                    finalCost = Math.max(0, record.price - (record.resale_price || 0));
-                }
-            }
-        }
-
-        const timeDiff = Math.max(0, endDate.getTime() - purchaseDate.getTime());
-        const daysUsed = Math.floor(timeDiff / (1000 * 3600 * 24));
-        const actualDaysForCalc = daysUsed + 1;
-
-        return finalCost / actualDaysForCalc;
-    }
 });
 
 router.get('/pie', authenticateToken, async (req, res) => {
@@ -143,7 +151,7 @@ router.get('/pie', authenticateToken, async (req, res) => {
         if (!parentId) {
             dataToShow = filteredTopLevel;
         } else {
-            const pid = parseInt(parentId);
+            const pid = parseInt(parentId, 10);
             const children = childrenMap[pid] || [];
             dataToShow = children.map(c => ({ ...c, _aggDailyCost: c._dailyCost }));
         }

@@ -6,30 +6,57 @@ const { log, getClientIp } = require('../utils/auditLog');
 
 const router = express.Router();
 
+/**
+ * Shared sorting function for records (S2: DRY extraction).
+ * Resolves the sort value from a record based on sortBy, then compares.
+ * For top-level records, uses aggregated fields (_aggPrice, _aggDailyCost, _aggDays).
+ * For child records, uses direct fields (price, _dailyCost, _days).
+ *
+ * @param {Array} records - Array of record objects to sort in-place
+ * @param {string} sortBy - Sort field key ('price'|'dailyCost'|'days'|'item_name'|'created_at')
+ * @param {string} sortOrder - 'ASC' or 'DESC'
+ * @param {boolean} isAggregated - Whether to use aggregated field names (_agg*)
+ * @returns {Array} The sorted array (same reference)
+ */
+function sortRecords(records, sortBy, sortOrder, isAggregated = false) {
+    return records.sort((a, b) => {
+        let valA, valB;
+        if (sortBy === 'price') {
+            valA = isAggregated ? a._aggPrice : a.price;
+            valB = isAggregated ? b._aggPrice : b.price;
+        } else if (sortBy === 'dailyCost') {
+            valA = isAggregated ? a._aggDailyCost : a._dailyCost;
+            valB = isAggregated ? b._aggDailyCost : b._dailyCost;
+        } else if (sortBy === 'days') {
+            valA = isAggregated ? a._aggDays : a._days;
+            valB = isAggregated ? b._aggDays : b._days;
+        } else if (sortBy === 'item_name') {
+            valA = a.item_name;
+            valB = b.item_name;
+        } else {
+            valA = new Date(a.created_at).getTime();
+            valB = new Date(b.created_at).getTime();
+        }
+
+        if (valA < valB) return sortOrder === 'ASC' ? -1 : 1;
+        if (valA > valB) return sortOrder === 'ASC' ? 1 : -1;
+        return 0;
+    });
+}
+
 // Get User Records (Active) with Pagination and Sorting
 router.get('/', authenticateToken, async (req, res) => {
     try {
-        const page = parseInt(req.query.page) || 1;
-        const limit = parseInt(req.query.limit) || 50;
+        const page = parseInt(req.query.page, 10) || 1;
+        const limit = parseInt(req.query.limit, 10) || 50;
         const offset = (page - 1) * limit;
         const sortBy = req.query.sortBy || 'created_at';
         const sortOrder = (req.query.sortOrder || 'DESC').toUpperCase();
 
         const { filteredTopLevel, childrenMap } = await getFilteredTreeRecords(req.user.id, req.query, db);
 
-        // 4. Sort Top-Level
-        filteredTopLevel.sort((a, b) => {
-            let valA, valB;
-            if (sortBy === 'price') { valA = a._aggPrice; valB = b._aggPrice; }
-            else if (sortBy === 'dailyCost') { valA = a._aggDailyCost; valB = b._aggDailyCost; }
-            else if (sortBy === 'days') { valA = a._aggDays; valB = b._aggDays; }
-            else if (sortBy === 'item_name') { valA = a.item_name; valB = b.item_name; }
-            else { valA = new Date(a.created_at).getTime(); valB = new Date(b.created_at).getTime(); }
-
-            if (valA < valB) return sortOrder === 'ASC' ? -1 : 1;
-            if (valA > valB) return sortOrder === 'ASC' ? 1 : -1;
-            return 0;
-        });
+        // 4. Sort Top-Level (uses aggregated fields)
+        sortRecords(filteredTopLevel, sortBy, sortOrder, true);
 
         // 5. Paginate Top-Level
         const paginatedTopLevel = filteredTopLevel.slice(offset, offset + limit);
@@ -40,18 +67,8 @@ router.get('/', authenticateToken, async (req, res) => {
             finalData.push(parent);
             const children = childrenMap[parent.id] || [];
 
-            // Sort children too
-            children.sort((a, b) => {
-                let valA, valB;
-                if (sortBy === 'price') { valA = a.price; valB = b.price; }
-                else if (sortBy === 'dailyCost') { valA = a._dailyCost; valB = b._dailyCost; }
-                else if (sortBy === 'days') { valA = a._days; valB = b._days; }
-                else if (sortBy === 'item_name') { valA = a.item_name; valB = b.item_name; }
-                else { valA = new Date(a.created_at).getTime(); valB = new Date(b.created_at).getTime(); }
-                if (valA < valB) return sortOrder === 'ASC' ? -1 : 1;
-                if (valA > valB) return sortOrder === 'ASC' ? 1 : -1;
-                return 0;
-            });
+            // Sort children (uses direct fields)
+            sortRecords(children, sortBy, sortOrder, false);
 
             finalData.push(...children);
         });

@@ -1,10 +1,15 @@
 const express = require('express');
 const crypto = require('crypto');
+const { promisify } = require('util');
 const db = require('../config/db');
 const { authenticateToken, requireAdmin } = require('../middlewares/auth');
 const { log, getClientIp } = require('../utils/auditLog');
 
 const router = express.Router();
+
+// Promisified db helpers for async/await usage
+const dbGet = promisify(db.get.bind(db));
+const dbAll = promisify(db.all.bind(db));
 
 // Get Users List (enhanced with is_disabled)
 router.get('/users', authenticateToken, requireAdmin, (req, res) => {
@@ -28,65 +33,55 @@ router.get('/users', authenticateToken, requireAdmin, (req, res) => {
     });
 });
 
-// System Overview
-router.get('/overview', authenticateToken, requireAdmin, (req, res) => {
-    const result = {};
+// System Overview — refactored to async/await (S1)
+router.get('/overview', authenticateToken, requireAdmin, async (req, res) => {
+    try {
+        const totalUsersRow = await dbGet('SELECT COUNT(*) as total FROM users');
+        const totalRecordsRow = await dbGet('SELECT COUNT(*) as total FROM records WHERE is_deleted = 0');
+        const activeUsersRow = await dbGet('SELECT COUNT(*) as active FROM users WHERE is_disabled = 0');
 
-    db.get(`SELECT COUNT(*) as total FROM users`, [], (err, row) => {
-        if (err) return res.status(500).json({ error: '查询失败' });
-        result.totalUsers = row.total;
+        // User registration trend (last 30 days)
+        const trend = await dbAll(`
+            SELECT date(created_at) as date, COUNT(*) as count
+            FROM users
+            WHERE created_at >= datetime('now', '-30 days')
+            GROUP BY date(created_at)
+            ORDER BY date ASC
+        `);
 
-        db.get(`SELECT COUNT(*) as total FROM records WHERE is_deleted = 0`, [], (err2, row2) => {
-            if (err2) return res.status(500).json({ error: '查询失败' });
-            result.totalRecords = row2.total;
+        const pkg = require('../../package.json');
+        const fs = require('fs');
+        const dbPath = require('../config/env').DB_PATH;
+        let dbSize = 'unknown';
+        try {
+            const stat = fs.statSync(dbPath);
+            dbSize = (stat.size / (1024 * 1024)).toFixed(2) + ' MB';
+        } catch (_) { /* ignore if file not accessible */ }
 
-            db.get(`SELECT COUNT(*) as active FROM users WHERE is_disabled = 0`, [], (err3, row3) => {
-                if (err3) return res.status(500).json({ error: '查询失败' });
-                result.activeUsers = row3.active;
-
-                // User registration trend (last 30 days)
-                db.all(`
-                    SELECT date(created_at) as date, COUNT(*) as count
-                    FROM users
-                    WHERE created_at >= datetime('now', '-30 days')
-                    GROUP BY date(created_at)
-                    ORDER BY date ASC
-                `, [], (err4, trend) => {
-                    if (err4) return res.status(500).json({ error: '查询失败' });
-
-                    const pkg = require('../../package.json');
-                    const fs = require('fs');
-                    const dbPath = require('../config/env').DB_PATH;
-                    let dbSize = 'unknown';
-                    try {
-                        const stat = fs.statSync(dbPath);
-                        dbSize = (stat.size / (1024 * 1024)).toFixed(2) + ' MB';
-                    } catch (_) {}
-
-                    res.json({
-                        stats: {
-                            totalUsers: result.totalUsers,
-                            activeUsers: result.activeUsers,
-                            totalRecords: result.totalRecords
-                        },
-                        trend: trend || [],
-                        system: {
-                            nodeVersion: process.version,
-                            dbSize,
-                            version: pkg.version || '1.0.0',
-                            env: process.env.NODE_ENV || 'development',
-                            uptime: Math.floor(process.uptime() / 86400) + ' 天'
-                        }
-                    });
-                });
-            });
+        res.json({
+            stats: {
+                totalUsers: totalUsersRow.total,
+                activeUsers: activeUsersRow.active,
+                totalRecords: totalRecordsRow.total
+            },
+            trend: trend || [],
+            system: {
+                nodeVersion: process.version,
+                dbSize,
+                version: pkg.version || '1.0.0',
+                env: process.env.NODE_ENV || 'development',
+                uptime: Math.floor(process.uptime() / 86400) + ' 天'
+            }
         });
-    });
+    } catch (err) {
+        console.error('Admin overview error:', err);
+        res.status(500).json({ error: '查询失败' });
+    }
 });
 
 // Get Audit Logs
 router.get('/logs', authenticateToken, requireAdmin, (req, res) => {
-    const page = Math.max(1, parseInt(req.query.page) || 1);
+    const page = Math.max(1, parseInt(req.query.page, 10) || 1);
     const limit = 50;
     const offset = (page - 1) * limit;
     const action = req.query.action || '';
@@ -115,8 +110,8 @@ router.get('/logs', authenticateToken, requireAdmin, (req, res) => {
 
 // Toggle User Role
 router.put('/user/:id/role', authenticateToken, requireAdmin, (req, res) => {
-    const targetId = parseInt(req.params.id);
-    if (targetId === parseInt(req.user.id)) {
+    const targetId = parseInt(req.params.id, 10);
+    if (targetId === parseInt(req.user.id, 10)) {
         return res.status(400).json({ error: '不能修改自己的角色' });
     }
 
@@ -133,8 +128,8 @@ router.put('/user/:id/role', authenticateToken, requireAdmin, (req, res) => {
 
 // Toggle User Disable/Enable
 router.put('/user/:id/disable', authenticateToken, requireAdmin, (req, res) => {
-    const targetId = parseInt(req.params.id);
-    if (targetId === parseInt(req.user.id)) {
+    const targetId = parseInt(req.params.id, 10);
+    if (targetId === parseInt(req.user.id, 10)) {
         return res.status(400).json({ error: '不能禁用自己的账号' });
     }
 
@@ -152,9 +147,10 @@ router.put('/user/:id/disable', authenticateToken, requireAdmin, (req, res) => {
 
 // Reset User Password
 router.post('/user/:id/reset-password', authenticateToken, requireAdmin, (req, res) => {
-    const targetId = parseInt(req.params.id);
+    const targetId = parseInt(req.params.id, 10);
     const bcrypt = require('bcrypt');
-    const tempPassword = crypto.randomBytes(4).toString('hex');
+    // Generate strong temporary password: 16 bytes = 128 bits entropy (32 hex chars)
+    const tempPassword = crypto.randomBytes(16).toString('hex');
 
     db.get(`SELECT username FROM users WHERE id = ?`, [targetId], async (err, user) => {
         if (err || !user) return res.status(404).json({ error: '用户不存在' });
@@ -173,10 +169,11 @@ router.post('/user/:id/reset-password', authenticateToken, requireAdmin, (req, r
 });
 
 // Delete User (existing, enhanced with audit log)
+// B1 fix: COMMIT now properly awaits callback before sending response
 router.delete('/user/:id', authenticateToken, requireAdmin, (req, res) => {
-    const targetUserId = req.params.id;
+    const targetUserId = parseInt(req.params.id, 10);
 
-    if (parseInt(targetUserId) === parseInt(req.user.id)) {
+    if (targetUserId === parseInt(req.user.id, 10)) {
         return res.status(400).json({ error: '操作驳回：你不能处决你自己' });
     }
 
@@ -184,21 +181,29 @@ router.delete('/user/:id', authenticateToken, requireAdmin, (req, res) => {
         if (err || !user) return res.status(404).json({ error: '用户不存在' });
 
         db.serialize(() => {
-            db.run("BEGIN TRANSACTION");
-            db.run("DELETE FROM records WHERE user_id = ?", [targetUserId], (delErr) => {
-                if (delErr) { db.run("ROLLBACK"); return res.status(500).json({ error: '清理用户账单数据失败' }); }
-                db.run("DELETE FROM totp_entries WHERE user_id = ?", [targetUserId], (totpErr) => {
-                    if (totpErr) { db.run("ROLLBACK"); return res.status(500).json({ error: '清理用户 TOTP 数据失败' }); }
-                    db.run("DELETE FROM users WHERE id = ?", [targetUserId], function (delErr2) {
-                    if (delErr2 || this.changes === 0) { db.run("ROLLBACK"); return res.status(500).json({ error: '铲除目标用户主体失败' }); }
-                    db.run("COMMIT");
-                    log(req.user.id, req.user.username, 'admin_delete_user', `用户: ${user.username}`, getClientIp(req));
-                    res.json({ message: '处决成功，关联记录已全线销毁。' });
+            db.run('BEGIN TRANSACTION');
+            db.run('DELETE FROM records WHERE user_id = ?', [targetUserId], (delErr) => {
+                if (delErr) { db.run('ROLLBACK'); return res.status(500).json({ error: '清理用户账单数据失败' }); }
+                db.run('DELETE FROM totp_entries WHERE user_id = ?', [targetUserId], (totpErr) => {
+                    if (totpErr) { db.run('ROLLBACK'); return res.status(500).json({ error: '清理用户 TOTP 数据失败' }); }
+                    db.run('DELETE FROM users WHERE id = ?', [targetUserId], function (delErr2) {
+                        if (delErr2 || this.changes === 0) {
+                            db.run('ROLLBACK');
+                            return res.status(500).json({ error: '铲除目标用户主体失败' });
+                        }
+                        db.run('COMMIT', (commitErr) => {
+                            if (commitErr) {
+                                db.run('ROLLBACK');
+                                return res.status(500).json({ error: '提交事务失败' });
+                            }
+                            log(req.user.id, req.user.username, 'admin_delete_user', `用户: ${user.username}`, getClientIp(req));
+                            res.json({ message: '处决成功，关联记录已全线销毁。' });
+                        });
+                    });
                 });
             });
         });
     });
-});
 });
 
 module.exports = router;

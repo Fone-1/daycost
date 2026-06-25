@@ -99,7 +99,7 @@ router.post('/login', authLimiter, (req, res) => {
                 const token = jwt.sign(
                     { id: user.id, username: user.username, role: userRole, token_version: Number(user.token_version || 0) },
                     JWT_SECRET,
-                    { expiresIn: '7d' }
+                    { expiresIn: '1d' }  // Reduced from 7 days to 1 day for security
                 );
                 log(user.id, user.username, 'login', '', getClientIp(req));
                 res.json({ token, username: user.username, role: userRole });

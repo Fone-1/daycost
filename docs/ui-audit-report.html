@@ -1,0 +1,1013 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DayCost UI 审计报告</title>
+<style>
+  :root {
+    --bg: #0f172a;
+    --surface: #1e293b;
+    --surface-2: #334155;
+    --text: #f1f5f9;
+    --text-2: #94a3b8;
+    --text-3: #64748b;
+    --accent: #f59e0b;
+    --accent-2: #fbbf24;
+    --red: #ef4444;
+    --red-soft: rgba(239,68,68,0.15);
+    --green: #10b981;
+    --green-soft: rgba(16,185,129,0.15);
+    --blue: #3b82f6;
+    --blue-soft: rgba(59,130,246,0.15);
+    --orange: #f97316;
+    --orange-soft: rgba(249,115,22,0.15);
+    --purple: #8b5cf6;
+    --purple-soft: rgba(139,92,246,0.15);
+    --radius: 12px;
+    --radius-lg: 20px;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'SF Pro Display', -apple-system, 'Segoe UI', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.6;
+    min-height: 100vh;
+  }
+
+  .container {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 2rem 1.5rem;
+  }
+
+  /* Header */
+  .report-header {
+    text-align: center;
+    padding: 3rem 0 2rem;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+    margin-bottom: 2.5rem;
+  }
+  .report-header h1 {
+    font-size: 2.2rem;
+    font-weight: 800;
+    background: linear-gradient(135deg, var(--accent), var(--accent-2));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    margin-bottom: 0.5rem;
+  }
+  .report-header p {
+    color: var(--text-2);
+    font-size: 1rem;
+  }
+  .report-date {
+    display: inline-block;
+    margin-top: 0.8rem;
+    padding: 4px 12px;
+    background: var(--surface);
+    border-radius: 20px;
+    font-size: 0.8rem;
+    color: var(--text-3);
+  }
+
+  /* Score Overview */
+  .score-overview {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem;
+    margin-bottom: 2.5rem;
+  }
+  .score-card {
+    background: var(--surface);
+    border-radius: var(--radius);
+    padding: 1.5rem;
+    text-align: center;
+    border: 1px solid rgba(255,255,255,0.06);
+  }
+  .score-card .score-ring {
+    width: 80px;
+    height: 80px;
+    margin: 0 auto 0.8rem;
+    position: relative;
+  }
+  .score-ring svg {
+    transform: rotate(-90deg);
+  }
+  .score-ring .ring-bg {
+    fill: none;
+    stroke: rgba(255,255,255,0.08);
+    stroke-width: 6;
+  }
+  .score-ring .ring-fill {
+    fill: none;
+    stroke-width: 6;
+    stroke-linecap: round;
+    transition: stroke-dashoffset 1s ease;
+  }
+  .score-ring .score-text {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 1.3rem;
+    font-weight: 700;
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .score-card .score-label {
+    font-size: 0.85rem;
+    color: var(--text-2);
+    font-weight: 500;
+  }
+  .score-card .score-status {
+    margin-top: 0.4rem;
+    font-size: 0.75rem;
+    padding: 2px 8px;
+    border-radius: 10px;
+    display: inline-block;
+  }
+
+  /* Section */
+  .section {
+    margin-bottom: 2.5rem;
+  }
+  .section-header {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 1.2rem;
+  }
+  .section-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.1rem;
+    flex-shrink: 0;
+  }
+  .section-header h2 {
+    font-size: 1.3rem;
+    font-weight: 700;
+  }
+  .section-desc {
+    color: var(--text-2);
+    font-size: 0.9rem;
+    margin-bottom: 1.2rem;
+    padding-left: 3rem;
+  }
+
+  /* Issue Cards */
+  .issue-list {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+  .issue-card {
+    background: var(--surface);
+    border-radius: var(--radius);
+    border: 1px solid rgba(255,255,255,0.06);
+    overflow: hidden;
+    transition: border-color 0.2s;
+  }
+  .issue-card:hover {
+    border-color: rgba(255,255,255,0.12);
+  }
+  .issue-header {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 1rem 1.2rem;
+    cursor: pointer;
+    user-select: none;
+  }
+  .issue-header:hover {
+    background: rgba(255,255,255,0.02);
+  }
+  .severity {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 10px;
+    border-radius: 6px;
+    font-size: 0.72rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    flex-shrink: 0;
+  }
+  .severity.high { background: var(--red-soft); color: #fca5a5; }
+  .severity.medium { background: var(--orange-soft); color: #fdba74; }
+  .severity.low { background: var(--blue-soft); color: #93c5fd; }
+  .severity.good { background: var(--green-soft); color: #6ee7b7; }
+
+  .issue-title {
+    font-weight: 600;
+    font-size: 0.95rem;
+    flex: 1;
+  }
+  .issue-toggle {
+    color: var(--text-3);
+    font-size: 0.8rem;
+    transition: transform 0.2s;
+  }
+  .issue-card.open .issue-toggle {
+    transform: rotate(180deg);
+  }
+  .issue-body {
+    display: none;
+    padding: 0 1.2rem 1.2rem;
+    color: var(--text-2);
+    font-size: 0.88rem;
+    line-height: 1.7;
+  }
+  .issue-card.open .issue-body {
+    display: block;
+  }
+  .issue-body p {
+    margin-bottom: 0.8rem;
+  }
+  .issue-body code {
+    background: rgba(255,255,255,0.08);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.82rem;
+    color: var(--accent-2);
+  }
+  .issue-body .fix-tag {
+    display: inline-block;
+    background: var(--green-soft);
+    color: #6ee7b7;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+  }
+
+  /* Code Example */
+  .code-block {
+    background: rgba(0,0,0,0.3);
+    border-radius: 8px;
+    padding: 1rem;
+    margin: 0.8rem 0;
+    overflow-x: auto;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.8rem;
+    line-height: 1.6;
+    color: #e2e8f0;
+    border: 1px solid rgba(255,255,255,0.06);
+  }
+  .code-block .comment { color: #64748b; }
+  .code-block .prop { color: #7dd3fc; }
+  .code-block .val { color: #fbbf24; }
+  .code-block .sel { color: #a78bfa; }
+
+  /* Visual Comparison */
+  .comparison {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+    margin: 1rem 0;
+  }
+  .comparison-box {
+    border-radius: 8px;
+    padding: 1rem;
+    text-align: center;
+  }
+  .comparison-box.before {
+    background: var(--red-soft);
+    border: 1px solid rgba(239,68,68,0.2);
+  }
+  .comparison-box.after {
+    background: var(--green-soft);
+    border: 1px solid rgba(16,185,129,0.2);
+  }
+  .comparison-box h4 {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin-bottom: 0.5rem;
+  }
+  .comparison-box.before h4 { color: #fca5a5; }
+  .comparison-box.after h4 { color: #6ee7b7; }
+
+  /* Mock UI Elements */
+  .mock-btn {
+    display: inline-block;
+    padding: 8px 16px;
+    border-radius: 8px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    margin: 4px;
+  }
+  .mock-btn.bad {
+    background: linear-gradient(135deg, #f59e0b, #d97706);
+    color: #0a0e1a;
+    width: 100%;
+    padding: 12px;
+  }
+  .mock-btn.good-primary {
+    background: var(--accent);
+    color: #0a0e1a;
+    padding: 10px 20px;
+  }
+  .mock-btn.good-secondary {
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.12);
+    color: var(--text-2);
+    padding: 10px 20px;
+  }
+
+  .mock-input {
+    display: block;
+    width: 100%;
+    padding: 8px 12px;
+    border-radius: 8px;
+    font-size: 0.85rem;
+    margin: 4px 0;
+  }
+  .mock-input.bad {
+    background: rgba(15,23,42,0.4);
+    border: 1px solid rgba(255,255,255,0.15);
+    color: white;
+  }
+  .mock-input.good {
+    background: var(--surface);
+    border: 1px solid rgba(255,255,255,0.1);
+    color: var(--text);
+  }
+
+  /* Summary Table */
+  .summary-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 1rem 0;
+    font-size: 0.85rem;
+  }
+  .summary-table th {
+    text-align: left;
+    padding: 0.6rem 0.8rem;
+    border-bottom: 1px solid rgba(255,255,255,0.1);
+    color: var(--text-2);
+    font-weight: 600;
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+  .summary-table td {
+    padding: 0.6rem 0.8rem;
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+  }
+  .summary-table tr:hover td {
+    background: rgba(255,255,255,0.02);
+  }
+
+  /* Priority Matrix */
+  .priority-matrix {
+    display: grid;
+    grid-template-columns: auto 1fr 1fr;
+    gap: 0;
+    margin: 1rem 0;
+    border-radius: var(--radius);
+    overflow: hidden;
+    border: 1px solid rgba(255,255,255,0.06);
+  }
+  .matrix-cell {
+    padding: 0.6rem 0.8rem;
+    font-size: 0.8rem;
+    border: 1px solid rgba(255,255,255,0.04);
+  }
+  .matrix-header {
+    background: var(--surface-2);
+    font-weight: 600;
+    color: var(--text-2);
+    text-transform: uppercase;
+    font-size: 0.7rem;
+    letter-spacing: 0.05em;
+  }
+  .matrix-label {
+    background: var(--surface);
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+  }
+  .matrix-high-impact { background: rgba(239,68,68,0.05); }
+  .matrix-low-impact { background: rgba(59,130,246,0.05); }
+
+  /* Footer */
+  .report-footer {
+    text-align: center;
+    padding: 2rem 0;
+    border-top: 1px solid rgba(255,255,255,0.06);
+    color: var(--text-3);
+    font-size: 0.8rem;
+  }
+
+  /* Responsive */
+  @media (max-width: 640px) {
+    .container { padding: 1rem; }
+    .report-header h1 { font-size: 1.6rem; }
+    .score-overview { grid-template-columns: repeat(2, 1fr); }
+    .comparison { grid-template-columns: 1fr; }
+    .priority-matrix { font-size: 0.75rem; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <!-- Header -->
+  <div class="report-header">
+    <h1>DayCost UI 审计报告</h1>
+    <p>日均成本追踪器 — 界面设计系统化审查与优化建议</p>
+    <span class="report-date">2026-06-25 · UI Designer</span>
+  </div>
+
+  <!-- Score Overview -->
+  <div class="score-overview">
+    <div class="score-card">
+      <div class="score-ring">
+        <svg viewBox="0 0 80 80">
+          <circle class="ring-bg" cx="40" cy="40" r="34"/>
+          <circle class="ring-fill" cx="40" cy="40" r="34"
+            stroke="#f59e0b"
+            stroke-dasharray="213.6"
+            stroke-dashoffset="64"/>
+        </svg>
+        <span class="score-text" style="color:#fbbf24">70</span>
+      </div>
+      <div class="score-label">视觉一致性</div>
+      <span class="score-status" style="background:var(--orange-soft);color:#fdba74">可改进</span>
+    </div>
+    <div class="score-card">
+      <div class="score-ring">
+        <svg viewBox="0 0 80 80">
+          <circle class="ring-bg" cx="40" cy="40" r="34"/>
+          <circle class="ring-fill" cx="40" cy="40" r="34"
+            stroke="#ef4444"
+            stroke-dasharray="213.6"
+            stroke-dashoffset="106.8"/>
+        </svg>
+        <span class="score-text" style="color:#fca5a5">50</span>
+      </div>
+      <div class="score-label">可访问性</div>
+      <span class="score-status" style="background:var(--red-soft);color:#fca5a5">需关注</span>
+    </div>
+    <div class="score-card">
+      <div class="score-ring">
+        <svg viewBox="0 0 80 80">
+          <circle class="ring-bg" cx="40" cy="40" r="34"/>
+          <circle class="ring-fill" cx="40" cy="40" r="34"
+            stroke="#10b981"
+            stroke-dasharray="213.6"
+            stroke-dashoffset="42.7"/>
+        </svg>
+        <span class="score-text" style="color:#6ee7b7">80</span>
+      </div>
+      <div class="score-label">响应式设计</div>
+      <span class="score-status" style="background:var(--green-soft);color:#6ee7b7">良好</span>
+    </div>
+    <div class="score-card">
+      <div class="score-ring">
+        <svg viewBox="0 0 80 80">
+          <circle class="ring-bg" cx="40" cy="40" r="34"/>
+          <circle class="ring-fill" cx="40" cy="40" r="34"
+            stroke="#f59e0b"
+            stroke-dasharray="213.6"
+            stroke-dashoffset="53.4"/>
+        </svg>
+        <span class="score-text" style="color:#fbbf24">75</span>
+      </div>
+      <div class="score-label">交互体验</div>
+      <span class="score-status" style="background:var(--orange-soft);color:#fdba74">可改进</span>
+    </div>
+  </div>
+
+  <!-- Section 1: Design Token System -->
+  <div class="section">
+    <div class="section-header">
+      <div class="section-icon" style="background:var(--purple-soft);color:#a78bfa;">🎨</div>
+      <h2>一、设计系统基础</h2>
+    </div>
+    <p class="section-desc">当前CSS缺乏统一的设计Token体系，大量硬编码值散落在各处，导致维护成本高、一致性差。</p>
+
+    <div class="issue-list">
+      <!-- Issue 1.1 -->
+      <div class="issue-card open">
+        <div class="issue-header" onclick="this.parentElement.classList.toggle('open')">
+          <span class="severity high">P0</span>
+          <span class="issue-title">缺少统一的 Design Token 系统</span>
+          <span class="issue-toggle">▼</span>
+        </div>
+        <div class="issue-body">
+          <p>当前 <code>:root</code> 中只定义了少量CSS变量（<code>--bg-color</code>, <code>--primary</code> 等），但大量颜色、间距、圆角值以硬编码方式散布在2800行CSS中。</p>
+          <p><strong>问题示例：</strong></p>
+          <div class="code-block">
+            <span class="comment">/* 当前：大量硬编码的 rgba 值 */</span><br>
+            <span class="sel">.glass</span> { <span class="prop">background</span>: <span class="val">rgba(17, 24, 39, 0.85)</span>; }<br>
+            <span class="sel">.btn-small</span> { <span class="prop">border</span>: <span class="val">1px solid rgba(255,255,255,0.06)</span>; }<br>
+            <span class="sel">.form-section</span> { <span class="prop">background</span>: <span class="val">rgba(15, 23, 42, 0.22)</span>; }<br>
+            <span class="comment">/* 至少 30+ 处不同的 rgba 值 */</span>
+          </div>
+          <p><span class="fix-tag">建议修复</span> 建立完整的Token层级：</p>
+          <div class="code-block">
+            <span class="sel">:root</span> {<br>
+            &nbsp;&nbsp;<span class="comment">/* 基础色板 */</span><br>
+            &nbsp;&nbsp;<span class="prop">--slate-50</span>: <span class="val">#f8fafc</span>;<br>
+            &nbsp;&nbsp;<span class="prop">--slate-900</span>: <span class="val">#0f172a</span>;<br>
+            &nbsp;&nbsp;<br>
+            &nbsp;&nbsp;<span class="comment">/* 语义化Token */</span><br>
+            &nbsp;&nbsp;<span class="prop">--surface-primary</span>: <span class="val">rgba(17, 24, 39, 0.85)</span>;<br>
+            &nbsp;&nbsp;<span class="prop">--surface-elevated</span>: <span class="val">rgba(15, 23, 42, 0.4)</span>;<br>
+            &nbsp;&nbsp;<span class="prop">--border-subtle</span>: <span class="val">rgba(255, 255, 255, 0.06)</span>;<br>
+            &nbsp;&nbsp;<span class="prop">--border-default</span>: <span class="val">rgba(255, 255, 255, 0.1)</span>;<br>
+            &nbsp;&nbsp;<span class="prop">--border-strong</span>: <span class="val">rgba(255, 255, 255, 0.15)</span>;<br>
+            &nbsp;&nbsp;<br>
+            &nbsp;&nbsp;<span class="comment">/* 间距 */</span><br>
+            &nbsp;&nbsp;<span class="prop">--space-xs</span>: <span class="val">0.25rem</span>;<br>
+            &nbsp;&nbsp;<span class="prop">--space-sm</span>: <span class="val">0.5rem</span>;<br>
+            &nbsp;&nbsp;<span class="prop">--space-md</span>: <span class="val">1rem</span>;<br>
+            &nbsp;&nbsp;<span class="prop">--space-lg</span>: <span class="val">1.5rem</span>;<br>
+            &nbsp;&nbsp;<span class="prop">--space-xl</span>: <span class="val">2rem</span>;<br>
+            &nbsp;&nbsp;<br>
+            &nbsp;&nbsp;<span class="comment">/* 圆角 */</span><br>
+            &nbsp;&nbsp;<span class="prop">--radius-sm</span>: <span class="val">6px</span>;<br>
+            &nbsp;&nbsp;<span class="prop">--radius-md</span>: <span class="val">10px</span>;<br>
+            &nbsp;&nbsp;<span class="prop">--radius-lg</span>: <span class="val">14px</span>;<br>
+            &nbsp;&nbsp;<span class="prop">--radius-xl</span>: <span class="val">16px</span>;<br>
+            }
+          </div>
+        </div>
+      </div>
+
+      <!-- Issue 1.2 -->
+      <div class="issue-card">
+        <div class="issue-header" onclick="this.parentElement.classList.toggle('open')">
+          <span class="severity medium">P1</span>
+          <span class="issue-title">圆角值不统一 (4px / 5px / 6px / 8px / 10px / 12px / 14px / 16px)</span>
+          <span class="issue-toggle">▼</span>
+        </div>
+        <div class="issue-body">
+          <p>CSS中使用了至少 <strong>8种不同的圆角值</strong>，缺乏统一的圆角比例系统：</p>
+          <table class="summary-table">
+            <tr><th>圆角值</th><th>使用位置</th><th>数量</th></tr>
+            <tr><td><code>4px</code></td><td>.tag-badge, .status-badge</td><td>~5处</td></tr>
+            <tr><td><code>5px</code></td><td>.status-btn, .delete-btn</td><td>~3处</td></tr>
+            <tr><td><code>6px</code></td><td>.settings-clickable, .totp-group-tag</td><td>~6处</td></tr>
+            <tr><td><code>8px</code></td><td>.btn-small, .tag-list-item</td><td>~8处</td></tr>
+            <tr><td><code>10px</code></td><td>.btn, .sort-select, .stat-badge</td><td>~10处</td></tr>
+            <tr><td><code>12px</code></td><td>.history-item, .form-section, .details</td><td>~12处</td></tr>
+            <tr><td><code>14px</code></td><td>.totp-card, .totp-sidebar, .child-item</td><td>~5处</td></tr>
+            <tr><td><code>16px</code></td><td>.glass, .main-nav</td><td>~6处</td></tr>
+          </table>
+          <p><span class="fix-tag">建议修复</span> 统一为4级圆角系统：<code>--radius-sm: 6px</code>, <code>--radius-md: 10px</code>, <code>--radius-lg: 14px</code>, <code>--radius-xl: 16px</code></p>
+        </div>
+      </div>
+
+      <!-- Issue 1.3 -->
+      <div class="issue-card">
+        <div class="issue-header" onclick="this.parentElement.classList.toggle('open')">
+          <span class="severity medium">P1</span>
+          <span class="issue-title">浅色主题覆盖过于碎片化</span>
+          <span class="issue-toggle">▼</span>
+        </div>
+        <div class="issue-body">
+          <p>浅色主题通过 <code>[data-theme="light"]</code> 选择器逐个覆盖样式，当前已有 <strong>60+ 条</strong> 覆盖规则，维护成本极高且容易遗漏。</p>
+          <p>更好的做法是使用语义化Token，让主题切换只改变Token的值：</p>
+          <div class="code-block">
+            <span class="comment">/* 当前：60+ 条逐个覆盖 */</span><br>
+            <span class="sel">[data-theme="light"] .history-name</span> { <span class="prop">color</span>: <span class="val">#1e293b</span>; }<br>
+            <span class="sel">[data-theme="light"] .history-meta</span> { <span class="prop">color</span>: <span class="val">#64748b</span>; }<br>
+            <span class="sel">[data-theme="light"] .totp-label</span> { <span class="prop">color</span>: <span class="val">#1e293b</span>; }<br>
+            <span class="comment">/* ... 还有 57 条 ... */</span><br>
+            <br>
+            <span class="comment">/* 建议：只切换Token值 */</span><br>
+            <span class="sel">:root</span> { <span class="prop">--text-primary</span>: <span class="val">#f1f5f9</span>; }<br>
+            <span class="sel">[data-theme="light"]</span> { <span class="prop">--text-primary</span>: <span class="val">#1e293b</span>; }<br>
+            <span class="comment">/* 所有使用 --text-primary 的地方自动适配 */</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Section 2: Accessibility -->
+  <div class="section">
+    <div class="section-header">
+      <div class="section-icon" style="background:var(--red-soft);color:#fca5a5;">♿</div>
+      <h2>二、可访问性 (Accessibility)</h2>
+    </div>
+    <p class="section-desc">作为涉及财务数据的应用，可访问性尤其重要。当前存在多个WCAG AA合规问题。</p>
+
+    <div class="issue-list">
+      <!-- Issue 2.1 -->
+      <div class="issue-card open">
+        <div class="issue-header" onclick="this.parentElement.classList.toggle('open')">
+          <span class="severity high">P0</span>
+          <span class="issue-title">多处颜色对比度不足 (WCAG AA 违规)</span>
+          <span class="issue-toggle">▼</span>
+        </div>
+        <div class="issue-body">
+          <p>WCAG AA要求正文对比度 ≥ 4.5:1，大文字 ≥ 3:1。当前多处不达标：</p>
+          <table class="summary-table">
+            <tr><th>元素</th><th>前景色</th><th>背景色</th><th>对比度</th><th>状态</th></tr>
+            <tr>
+              <td>.text-secondary / .nav-btn</td>
+              <td><code>#94a3b8</code></td>
+              <td><code>#0a0e1a</code></td>
+              <td>5.2:1</td>
+              <td><span class="severity good">达标</span></td>
+            </tr>
+            <tr>
+              <td>.text-muted / .badge-label</td>
+              <td><code>#64748b</code></td>
+              <td><code>#0a0e1a</code></td>
+              <td>3.1:1</td>
+              <td><span class="severity high">不达标</span></td>
+            </tr>
+            <tr>
+              <td>disabled button</td>
+              <td>opacity: 0.5</td>
+              <td>varied</td>
+              <td>~2.5:1</td>
+              <td><span class="severity high">不达标</span></td>
+            </tr>
+            <tr>
+              <td>.totp-remaining</td>
+              <td><code>#64748b</code></td>
+              <td><code>rgba(255,255,255,0.03)</code></td>
+              <td>~2.8:1</td>
+              <td><span class="severity high">不达标</span></td>
+            </tr>
+          </table>
+          <p><span class="fix-tag">建议修复</span> 将 <code>--text-muted</code> 从 <code>#64748b</code> 调整为 <code>#8494a7</code>（对比度提升至4.6:1），或在深色背景上使用更亮的灰色。</p>
+        </div>
+      </div>
+
+      <!-- Issue 2.2 -->
+      <div class="issue-card">
+        <div class="issue-header" onclick="this.parentElement.classList.toggle('open')">
+          <span class="severity high">P0</span>
+          <span class="issue-title">缺少焦点指示器 (Focus Indicator)</span>
+          <span class="issue-toggle">▼</span>
+        </div>
+        <div class="issue-body">
+          <p>键盘用户无法通过Tab键看到当前焦点位置。CSS中 <strong>没有定义任何 <code>:focus-visible</code> 样式</strong>，浏览器默认的outline被 <code>outline: none</code> 移除后没有任何替代。</p>
+          <div class="code-block">
+            <span class="comment">/* 当前：焦点样式被移除 */</span><br>
+            <span class="sel">input:focus, select:focus</span> {<br>
+            &nbsp;&nbsp;<span class="prop">outline</span>: <span class="val">none</span>; <span class="comment">/* ← 键盘用户看不到焦点 */</span><br>
+            &nbsp;&nbsp;<span class="prop">border-color</span>: <span class="val">var(--primary)</span>;<br>
+            &nbsp;&nbsp;<span class="prop">box-shadow</span>: <span class="val">0 0 0 3px var(--primary-glow)</span>;<br>
+            }<br>
+            <br>
+            <span class="comment">/* 按钮完全没有焦点样式 */</span><br>
+            <span class="sel">.btn</span> { <span class="comment">/* 没有 :focus 规则 */</span> }
+          </div>
+          <p><span class="fix-tag">建议修复</span> 为所有交互元素添加 <code>:focus-visible</code> 样式：</p>
+          <div class="code-block">
+            <span class="sel">.btn:focus-visible</span> {<br>
+            &nbsp;&nbsp;<span class="prop">outline</span>: <span class="val">2px solid var(--primary)</span>;<br>
+            &nbsp;&nbsp;<span class="prop">outline-offset</span>: <span class="val">2px</span>;<br>
+            }
+          </div>
+        </div>
+      </div>
+
+      <!-- Issue 2.3 -->
+      <div class="issue-card">
+        <div class="issue-header" onclick="this.parentElement.classList.toggle('open')">
+          <span class="severity medium">P1</span>
+          <span class="issue-title">触摸目标尺寸不足 (Touch Target)</span>
+          <span class="issue-toggle">▼</span>
+        </div>
+        <div class="issue-body">
+          <p>WCAG 2.5.5 要求交互元素最小触摸目标为 44×44px。以下元素不达标：</p>
+          <table class="summary-table">
+            <tr><th>元素</th><th>实际尺寸</th><th>问题</th></tr>
+            <tr><td><code>.delete-btn</code> / <code>.status-btn</code></td><td>~32×32px</td><td>仅 padding:8px + font-size:1.1rem</td></tr>
+            <tr><td><code>.btn-icon</code></td><td>~24×28px</td><td>padding: 2px 6px</td></tr>
+            <tr><td><code>.totp-delete-btn</code></td><td>~28×28px</td><td>padding: 2px 6px</td></tr>
+            <tr><td><code>.toggle-children-btn</code></td><td>~60×22px</td><td>高度不足</td></tr>
+            <tr><td><code>.modal-close</code></td><td>~32×32px</td><td>纯文字×，无padding</td></tr>
+          </table>
+          <p><span class="fix-tag">建议修复</span> 将所有交互元素的最小点击区域设为 44×44px，可通过增加 <code>min-height</code> 和 <code>min-width</code> 实现。</p>
+        </div>
+      </div>
+
+      <!-- Issue 2.4 -->
+      <div class="issue-card">
+        <div class="issue-header" onclick="this.parentElement.classList.toggle('open')">
+          <span class="severity medium">P1</span>
+          <span class="issue-title">缺少ARIA标签和语义化标记</span>
+          <span class="issue-toggle">▼</span>
+        </div>
+        <div class="issue-body">
+          <p>多个交互组件缺少必要的ARIA属性：</p>
+          <ul style="padding-left:1.2rem;margin-bottom:0.8rem;">
+            <li>FAB按钮 <code>+</code> 没有 <code>aria-label</code></li>
+            <li>Modal弹窗缺少 <code>role="dialog"</code> 和 <code>aria-modal="true"</code></li>
+            <li>Tab切换组件缺少 <code>role="tablist"</code> / <code>role="tab"</code> / <code>aria-selected</code></li>
+            <li>统计badge缺少 <code>aria-label</code> 描述</li>
+            <li>树形展开/收起按钮缺少 <code>aria-expanded</code></li>
+          </ul>
+          <p><span class="fix-tag">建议修复</span> 为所有交互元素添加语义化ARIA属性，确保屏幕阅读器能正确解读界面。</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Section 3: Interaction & UX -->
+  <div class="section">
+    <div class="section-header">
+      <div class="section-icon" style="background:var(--orange-soft);color:#fdba74;">👆</div>
+      <h2>三、交互与用户体验</h2>
+    </div>
+    <p class="section-desc">交互细节直接影响用户的操作效率和满意度。</p>
+
+    <div class="issue-list">
+      <!-- Issue 3.1 -->
+      <div class="issue-card open">
+        <div class="issue-header" onclick="this.parentElement.classList.toggle('open')">
+          <span class="severity high">P0</span>
+          <span class="issue-title">按钮层级混乱 — 所有按钮视觉权重相同</span>
+          <span class="issue-toggle">▼</span>
+        </div>
+        <div class="issue-body">
+          <p>当前 <code>.btn</code> 类默认是全宽、渐变背景、大字号的"主按钮"样式。但"取消"、"返回"等次要操作也使用相同样式，导致视觉层级混乱。</p>
+          <div class="comparison">
+            <div class="comparison-box before">
+              <h4>当前状态</h4>
+              <div class="mock-btn bad">保存修改</div>
+              <div class="mock-btn bad">取消</div>
+              <div class="mock-btn bad">返回</div>
+              <p style="font-size:0.75rem;margin-top:0.5rem;color:#fca5a5">所有按钮都是全宽渐变，用户无法区分主次</p>
+            </div>
+            <div class="comparison-box after">
+              <h4>建议方案</h4>
+              <div class="mock-btn good-primary">保存修改</div>
+              <div class="mock-btn good-secondary">取消</div>
+              <div class="mock-btn good-secondary">返回</div>
+              <p style="font-size:0.75rem;margin-top:0.5rem;color:#6ee7b7">主要操作突出，次要操作弱化</p>
+            </div>
+          </div>
+          <p><span class="fix-tag">建议修复</span> 建立三级按钮系统：Primary（渐变填充）、Secondary（边框/透明）、Ghost（纯文字），并明确各自的使用场景。</p>
+        </div>
+      </div>
+
+      <!-- Issue 3.2 -->
+      <div class="issue-card">
+        <div class="issue-header" onclick="this.parentElement.classList.toggle('open')">
+          <span class="severity medium">P1</span>
+          <span class="issue-title">表单输入框缺少占位符样式对比</span>
+          <span class="issue-toggle">▼</span>
+        </div>
+        <div class="issue-body">
+          <p>输入框的 placeholder 颜色与实际输入文字颜色对比度太低（都是白色系），用户难以区分"已填写"和"未填写"状态。</p>
+          <p><span class="fix-tag">建议修复</span> 为 placeholder 设置更明显的弱化色：</p>
+          <div class="code-block">
+            <span class="sel">input::placeholder</span> {<br>
+            &nbsp;&nbsp;<span class="prop">color</span>: <span class="val">rgba(148, 163, 184, 0.5)</span>;<br>
+            &nbsp;&nbsp;<span class="prop">font-style</span>: <span class="val">italic</span>;<br>
+            }
+          </div>
+        </div>
+      </div>
+
+      <!-- Issue 3.3 -->
+      <div class="issue-card">
+        <div class="issue-header" onclick="this.parentElement.classList.toggle('open')">
+          <span class="severity medium">P1</span>
+          <span class="issue-title">Modal弹窗缺少入场/退场动画</span>
+          <span class="issue-toggle">▼</span>
+        </div>
+        <div class="issue-body">
+          <p>Modal关闭时直接 <code>display:none</code>，没有退场动画，体验生硬。当前只有入场的 <code>slideUp</code> 动画。</p>
+          <p><span class="fix-tag">建议修复</span> 添加关闭动画，使用 <code>opacity</code> + <code>transform</code> 过渡：</p>
+          <div class="code-block">
+            <span class="sel">.modal-overlay.closing</span> {<br>
+            &nbsp;&nbsp;<span class="prop">opacity</span>: <span class="val">0</span>;<br>
+            &nbsp;&nbsp;<span class="prop">pointer-events</span>: <span class="val">none</span>;<br>
+            &nbsp;&nbsp;<span class="prop">transition</span>: <span class="val">opacity 0.2s ease</span>;<br>
+            }<br>
+            <span class="sel">.modal-overlay.closing .modal-content</span> {<br>
+            &nbsp;&nbsp;<span class="prop">transform</span>: <span class="val">translateY(20px) scale(0.95)</span>;<br>
+            &nbsp;&nbsp;<span class="prop">transition</span>: <span class="val">transform 0.2s ease</span>;<br>
+            }
+          </div>
+        </div>
+      </div>
+
+      <!-- Issue 3.4 -->
+      <div class="issue-card">
+        <div class="issue-header" onclick="this.parentElement.classList.toggle('open')">
+          <span class="severity low">P2</span>
+          <span class="issue-title">统计面板的图表标题位置不一致</span>
+          <span class="issue-toggle">▼</span>
+        </div>
+        <div class="issue-body">
+          <p>成本排名图表的标题使用 <code>writing-mode: vertical-rl</code> 竖排显示在左侧，而趋势图标题在底部居中，标签分布图标题在顶部。三种图表三种标题位置，缺乏一致性。</p>
+          <p><span class="fix-tag">建议修复</span> 统一图表标题位置为顶部左对齐或底部居中，保持视觉节奏一致。</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Section 4: Responsive -->
+  <div class="section">
+    <div class="section-header">
+      <div class="section-icon" style="background:var(--blue-soft);color:#93c5fd;">📱</div>
+      <h2>四、响应式设计</h2>
+    </div>
+    <p class="section-desc">移动端适配整体不错，但存在一些边界情况。</p>
+
+    <div class="issue-list">
+      <div class="issue-card">
+        <div class="issue-header" onclick="this.parentElement.classList.toggle('open')">
+          <span class="severity medium">P1</span>
+          <span class="issue-title">断点系统不统一 (768px vs 799px vs 600px vs 480px)</span>
+          <span class="issue-toggle">▼</span>
+        </div>
+        <div class="issue-body">
+          <p>CSS中使用了4个不同的断点值，缺乏统一的断点系统：</p>
+          <div class="code-block">
+            <span class="sel">@media (max-width: 480px)</span> &nbsp;&nbsp;<span class="comment">/* nav字体 */</span><br>
+            <span class="sel">@media (max-width: 600px)</span> &nbsp;&nbsp;<span class="comment">/* form-row */</span><br>
+            <span class="sel">@media (max-width: 768px)</span> &nbsp;&nbsp;<span class="comment">/* 大量移动端样式 */</span><br>
+            <span class="sel">@media (max-width: 799px)</span> &nbsp;&nbsp;<span class="comment">/* mobile nav, body padding */</span><br>
+            <span class="sel">@media (min-width: 800px)</span> &nbsp;&nbsp;<span class="comment">/* desktop layout */</span>
+          </div>
+          <p><span class="fix-tag">建议修复</span> 统一为3个标准断点：<code>sm: 640px</code>, <code>md: 768px</code>, <code>lg: 1024px</code></p>
+        </div>
+      </div>
+
+      <div class="issue-card">
+        <div class="issue-header" onclick="this.parentElement.classList.toggle('open')">
+          <span class="severity low">P2</span>
+          <span class="issue-title">FAB按钮在桌面端可能遮挡内容</span>
+          <span class="issue-toggle">▼</span>
+        </div>
+        <div class="issue-body">
+          <p>FAB按钮固定在右下角 <code>position: fixed; bottom: 30px; right: 30px</code>，在桌面端可能遮挡列表底部内容。</p>
+          <p><span class="fix-tag">建议修复</span> 在桌面端考虑将添加按钮集成到列表头部，或为列表底部增加 <code>padding-bottom</code> 避免遮挡。</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Section 5: Visual Polish -->
+  <div class="section">
+    <div class="section-header">
+      <div class="section-icon" style="background:var(--green-soft);color:#6ee7b7;">✨</div>
+      <h2>五、视觉打磨</h2>
+    </div>
+
+    <div class="issue-list">
+      <div class="issue-card">
+        <div class="issue-header" onclick="this.parentElement.classList.toggle('open')">
+          <span class="severity low">P2</span>
+          <span class="issue-title">毛玻璃效果过度使用</span>
+          <span class="issue-toggle">▼</span>
+        </div>
+        <div class="issue-body">
+          <p><code>.glass</code> 类被应用到几乎所有容器上（卡片、导航、Modal、侧边栏），<code>backdrop-filter: blur(16px)</code> 在低端设备上会造成性能问题，且过度使用会降低视觉层次感。</p>
+          <p><span class="fix-tag">建议修复</span> 只在顶层容器使用毛玻璃效果，子容器使用纯色背景。或者检测设备性能，低性能设备自动降级。</p>
+        </div>
+      </div>
+
+      <div class="issue-card">
+        <div class="issue-header" onclick="this.parentElement.classList.toggle('open')">
+          <span class="severity low">P2</span>
+          <span class="issue-title">滚动条样式仅支持WebKit</span>
+          <span class="issue-toggle">▼</span>
+        </div>
+        <div class="issue-body">
+          <p>自定义滚动条使用 <code>::-webkit-scrollbar</code> 伪元素，Firefox用户会看到默认滚动条。</p>
+          <p><span class="fix-tag">建议修复</span> 添加标准属性 <code>scrollbar-width: thin</code> 和 <code>scrollbar-color</code>：</p>
+          <div class="code-block">
+            <span class="sel">.history-list</span> {<br>
+            &nbsp;&nbsp;<span class="prop">scrollbar-width</span>: <span class="val">thin</span>;<br>
+            &nbsp;&nbsp;<span class="prop">scrollbar-color</span>: <span class="val">rgba(255,255,255,0.2) transparent</span>;<br>
+            }
+          </div>
+        </div>
+      </div>
+
+      <div class="issue-card">
+        <div class="issue-header" onclick="this.parentElement.classList.toggle('open')">
+          <span class="severity low">P2</span>
+          <span class="issue-title">缺少空状态的视觉引导</span>
+          <span class="issue-toggle">▼</span>
+        </div>
+        <div class="issue-body">
+          <p>空状态（无记录、无标签数据）只显示纯文字，缺少图标和行动引导。新用户首次进入时不知道如何开始。</p>
+          <p><span class="fix-tag">建议修复</span> 添加空状态插图和明确的CTA按钮：</p>
+          <div style="text-align:center;padding:1rem;background:rgba(255,255,255,0.03);border-radius:8px;margin:0.5rem 0;">
+            <div style="font-size:2.5rem;margin-bottom:0.5rem;">📦</div>
+            <div style="color:var(--text-2);font-size:0.9rem;margin-bottom:0.8rem;">还没有资产记录</div>
+            <div class="mock-btn good-primary" style="display:inline-block;">+ 添加第一件物品</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Priority Matrix -->
+  <div class="section">
+    <div class="section-header">
+      <div class="section-icon" style="background:var(--accent);color:#0a0e1a;">🎯</div>
+      <h2>六、优先级矩阵</h2>
+    </div>
+
+    <div class="priority-matrix">
+      <div class="matrix-cell matrix-header"></div>
+      <div class="matrix-cell matrix-header">低成本（易实现）</div>
+      <div class="matrix-cell matrix-header">高成本（需重构）</div>
+
+      <div class="matrix-cell matrix-label matrix-high-impact" style="color:#fca5a5;">高影响</div>
+      <div class="matrix-cell matrix-high-impact">
+        <strong>🔴 立即修复</strong><br>
+        · 颜色对比度修复<br>
+        · 添加 focus-visible<br>
+        · 按钮层级分离
+      </div>
+      <div class="matrix-cell matrix-high-impact">
+        <strong>🟠 规划排期</strong><br>
+        · Design Token 系统<br>
+        · 浅色主题重构<br>
+        · ARIA 语义化
+      </div>
+
+      <div class="matrix-cell matrix-label matrix-low-impact" style="color:#93c5fd;">低影响</div>
+      <div class="matrix-cell matrix-low-impact">
+        <strong>🔵 顺手修复</strong><br>
+        · 圆角统一<br>
+        · 断点统一<br>
+        · 滚动条兼容
+      </div>
+      <div class="matrix-cell matrix-low-impact">
+        <strong>⚪ 可选优化</strong><br>
+        · Modal 动画<br>
+        · 空状态引导<br>
+        · 毛玻璃降级
+      </div>
+    </div>
+  </div>
+
+  <!-- Summary -->
+  <div class="section">
+    <div class="section-header">
+      <div class="section-icon" style="background:var(--accent-2);color:#0a0e1a;">📊</div>
+      <h2>七、总结</h2>
+    </div>
+
+    <table class="summary-table">
+      <tr><th>维度</th><th>评分</th><th>核心问题</th><th>建议</th></tr>
+      <tr>
+        <td>设计系统</td>
+        <td><span style="color:#fbbf24;font-weight:700">70/100</span></td>
+        <td>Token缺失、硬编码值泛滥</td>
+        <td>建立语义化Token系统</td>
+      </tr>
+      <tr>
+        <td>可访问性</td>
+        <td><span style="color:#fca5a5;font-weight:700">50/100</span></td>
+        <td>对比度不足、无焦点样式、缺ARIA</td>
+        <td>系统性修复WCAG AA合规</td>
+      </tr>
+      <tr>
+        <td>响应式</td>
+        <td><span style="color:#6ee7b7;font-weight:700">80/100</span></td>
+        <td>断点不统一、FAB遮挡</td>
+        <td>统一断点系统</td>
+      </tr>
+      <tr>
+        <td>交互体验</td>
+        <td><span style="color:#fdba74;font-weight:700">75/100</span></td>
+        <td>按钮层级、Modal动画</td>
+        <td>建立按钮层级体系</td>
+      </tr>
+      <tr>
+        <td>视觉打磨</td>
+        <td><span style="color:#fdba74;font-weight:700">75/100</span></td>
+        <td>毛玻璃滥用、空状态简陋</td>
+        <td>精简装饰、丰富空状态</td>
+      </tr>
+    </table>
+
+    <p style="margin-top:1.2rem;color:var(--text-2);font-size:0.9rem;">
+      <strong>整体评价：</strong>DayCost 的 UI 已经具备了不错的基础——Financial Noir 风格的暗色主题辨识度高，玻璃态卡片有质感，移动端适配做了不少工作。但设计系统层面的缺失（Token、一致性）和可访问性问题是阻碍其走向"商业级"的主要瓶颈。建议按优先级矩阵，先解决高影响低成本的问题，再逐步构建完整的设计系统。
+    </p>
+  </div>
+
+  <div class="report-footer">
+    <p>DayCost UI Audit Report · Generated by UI Designer · 2026-06-25</p>
+  </div>
+</div>
+</body>
+</html>
