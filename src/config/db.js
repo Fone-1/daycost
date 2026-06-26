@@ -175,6 +175,23 @@ FROM records;`);
                 created_at DATETIME DEFAULT CURRENT_TIMESTAMP
             )`);
             db.run("CREATE INDEX IF NOT EXISTS idx_audit_logs_time ON audit_logs(created_at DESC)");
+
+            // Admin: system settings table
+            db.run(`CREATE TABLE IF NOT EXISTS system_settings (
+                key TEXT PRIMARY KEY,
+                value TEXT,
+                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                updated_by TEXT
+            )`);
+
+            // Insert default settings if table is empty
+            db.run(`INSERT OR IGNORE INTO system_settings (key, value) VALUES
+                ('site_name', 'DayCost'),
+                ('registration_enabled', 'true'),
+                ('max_records_per_user', '0'),
+                ('session_timeout', '7'),
+                ('maintenance_mode', 'false')
+            `);
         });
     }
 });

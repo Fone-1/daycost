@@ -7,6 +7,9 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+    <!-- Design System (main app) -->
+    <link rel="stylesheet" href="/style.css">
+    <link rel="stylesheet" href="/css/design-system.css">
     <script src="/chart.min.js"></script>
     <link rel="stylesheet" href="admin.css">
 </head>
@@ -14,25 +17,51 @@
     <div id="adminApp" class="admin-app hidden">
         <!-- Top Bar -->
         <header class="admin-topbar glass">
-            <a href="/" class="admin-back">← 返回主页</a>
+            <a href="/" class="admin-back">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
+                <span class="admin-back-text">返回主页</span>
+            </a>
             <h1 class="admin-title">DayCost 管理面板</h1>
-            <button id="adminLogoutBtn" class="admin-logout">退出</button>
+            <div class="admin-topbar-right">
+                <div class="admin-avatar" id="adminAvatar" title="管理员">
+                    <span class="admin-avatar-icon">A</span>
+                </div>
+                <button id="adminLogoutBtn" class="admin-logout">退出</button>
+            </div>
         </header>
 
         <div class="admin-body">
-            <!-- Sidebar -->
+            <!-- Sidebar (Desktop + Tablet) -->
             <aside class="admin-sidebar glass">
                 <button class="admin-nav-item active" data-section="overview">
-                    <span class="admin-nav-icon">📊</span>
-                    <span>概览</span>
+                    <span class="admin-nav-icon">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
+                    </span>
+                    <span class="admin-nav-label">概览</span>
                 </button>
                 <button class="admin-nav-item" data-section="users">
-                    <span class="admin-nav-icon">👥</span>
-                    <span>用户管理</span>
+                    <span class="admin-nav-icon">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+                    </span>
+                    <span class="admin-nav-label">用户管理</span>
+                </button>
+                <button class="admin-nav-item" data-section="analytics">
+                    <span class="admin-nav-icon">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>
+                    </span>
+                    <span class="admin-nav-label">数据洞察</span>
+                </button>
+                <button class="admin-nav-item" data-section="settings">
+                    <span class="admin-nav-icon">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+                    </span>
+                    <span class="admin-nav-label">系统设置</span>
                 </button>
                 <button class="admin-nav-item" data-section="logs">
-                    <span class="admin-nav-icon">📋</span>
-                    <span>操作日志</span>
+                    <span class="admin-nav-icon">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+                    </span>
+                    <span class="admin-nav-label">操作日志</span>
                 </button>
             </aside>
 
@@ -48,7 +77,9 @@
                         <div class="instrument-card" data-accent="amber">
                             <div class="instrument-glow"></div>
                             <div class="instrument-head">
-                                <span class="instrument-icon">◈</span>
+                                <span class="instrument-icon">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+                                </span>
                                 <span class="instrument-label">总用户数</span>
                             </div>
                             <div class="instrument-readout" id="statTotalUsers">0</div>
@@ -57,7 +88,9 @@
                         <div class="instrument-card" data-accent="green">
                             <div class="instrument-glow"></div>
                             <div class="instrument-head">
-                                <span class="instrument-icon">◉</span>
+                                <span class="instrument-icon">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+                                </span>
                                 <span class="instrument-label">活跃用户</span>
                             </div>
                             <div class="instrument-readout" id="statActiveUsers">0</div>
@@ -66,7 +99,9 @@
                         <div class="instrument-card" data-accent="blue">
                             <div class="instrument-glow"></div>
                             <div class="instrument-head">
-                                <span class="instrument-icon">◆</span>
+                                <span class="instrument-icon">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
+                                </span>
                                 <span class="instrument-label">总记录数</span>
                             </div>
                             <div class="instrument-readout" id="statTotalRecords">0</div>
@@ -75,7 +110,9 @@
                         <div class="instrument-card" data-accent="slate">
                             <div class="instrument-glow"></div>
                             <div class="instrument-head">
-                                <span class="instrument-icon">◎</span>
+                                <span class="instrument-icon">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+                                </span>
                                 <span class="instrument-label">运行时间</span>
                             </div>
                             <div class="instrument-readout mono" id="statUptime">--:--:--</div>
@@ -122,24 +159,303 @@
                             <span class="cmd-input-prompt">❯</span>
                             <input type="text" id="userSearchInput" class="cmd-input" placeholder="filter users..." autocomplete="off" spellcheck="false">
                         </div>
+                        <div class="cmd-select-wrap">
+                            <select id="userRoleFilter" class="cmd-select">
+                                <option value="">全部角色</option>
+                                <option value="admin">管理员</option>
+                                <option value="user">普通用户</option>
+                            </select>
+                        </div>
+                        <div class="cmd-select-wrap">
+                            <select id="userStatusFilter" class="cmd-select">
+                                <option value="">全部状态</option>
+                                <option value="active">正常</option>
+                                <option value="disabled">已禁用</option>
+                            </select>
+                        </div>
                         <button id="adminRefreshUsersBtn" class="tool-btn" title="刷新">
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
                         </button>
                     </div>
+                    <!-- Batch Toolbar -->
+                    <div id="batchToolbar" class="batch-toolbar glass hidden">
+                        <span id="batchCount" class="batch-count">0</span>
+                        <span class="batch-label">项已选择</span>
+                        <button id="batchDisableBtn" class="batch-btn batch-btn-warn">批量禁用</button>
+                        <button id="batchEnableBtn" class="batch-btn batch-btn-success">批量启用</button>
+                        <button id="batchDeleteBtn" class="batch-btn batch-btn-danger">批量删除</button>
+                        <button id="batchCancelBtn" class="batch-btn batch-btn-secondary">取消</button>
+                    </div>
                     <div class="manifest-panel glass">
                         <div class="manifest-header">
                             <div class="manifest-row manifest-thead">
-                                <span class="manifest-cell col-id">ID</span>
-                                <span class="manifest-cell col-user">用户名</span>
+                                <span class="manifest-cell col-checkbox">
+                                    <input type="checkbox" id="selectAllUsers" class="admin-checkbox" title="全选">
+                                </span>
+                                <span class="manifest-cell col-id" data-sort="id" style="cursor:pointer">ID <span class="sort-indicator"></span></span>
+                                <span class="manifest-cell col-user" data-sort="username" style="cursor:pointer">用户名 <span class="sort-indicator"></span></span>
                                 <span class="manifest-cell col-role">角色</span>
                                 <span class="manifest-cell col-status">状态</span>
-                                <span class="manifest-cell col-date">注册时间</span>
-                                <span class="manifest-cell col-items">物品</span>
-                                <span class="manifest-cell col-spent">总投入</span>
+                                <span class="manifest-cell col-date" data-sort="created_at" style="cursor:pointer">注册时间 <span class="sort-indicator"></span></span>
+                                <span class="manifest-cell col-items" data-sort="total_items" style="cursor:pointer">物品 <span class="sort-indicator"></span></span>
+                                <span class="manifest-cell col-spent" data-sort="total_spent" style="cursor:pointer">总投入 <span class="sort-indicator"></span></span>
                                 <span class="manifest-cell col-actions">操作</span>
                             </div>
                         </div>
                         <div class="manifest-body" id="adminUsersList"></div>
+                    </div>
+                </section>
+
+                <!-- Analytics Section (Phase 3) -->
+                <section id="section-analytics" class="admin-section">
+                    <div class="section-header">
+                        <h2>数据洞察</h2>
+                        <div class="analytics-toolbar">
+                            <div class="cmd-select-wrap">
+                                <select id="analyticsTimeRange" class="cmd-select">
+                                    <option value="7d">近 7 天</option>
+                                    <option value="30d" selected>近 30 天</option>
+                                    <option value="90d">近 90 天</option>
+                                    <option value="12m">近 12 月</option>
+                                </select>
+                            </div>
+                            <button id="analyticsExportBtn" class="tool-btn" title="导出报表">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                            </button>
+                            <button id="analyticsRefreshBtn" class="tool-btn" title="刷新">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Summary Cards -->
+                    <div class="analytics-summary-grid">
+                        <div class="analytics-summary-card" data-accent="amber">
+                            <div class="instrument-glow"></div>
+                            <div class="instrument-head">
+                                <span class="instrument-icon">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+                                </span>
+                                <span class="instrument-label">总用户</span>
+                            </div>
+                            <div class="instrument-readout" id="analyticsTotalUsers">0</div>
+                            <div class="instrument-bar"><div class="instrument-bar-fill"></div></div>
+                            <div class="analytics-change" id="analyticsGrowthRate">--</div>
+                        </div>
+                        <div class="analytics-summary-card" data-accent="green">
+                            <div class="instrument-glow"></div>
+                            <div class="instrument-head">
+                                <span class="instrument-icon">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+                                </span>
+                                <span class="instrument-label">活跃用户</span>
+                            </div>
+                            <div class="instrument-readout" id="analyticsActiveUsers">0</div>
+                            <div class="instrument-bar"><div class="instrument-bar-fill"></div></div>
+                            <div class="analytics-change" id="analyticsActiveRate">--</div>
+                        </div>
+                        <div class="analytics-summary-card" data-accent="blue">
+                            <div class="instrument-glow"></div>
+                            <div class="instrument-head">
+                                <span class="instrument-icon">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
+                                </span>
+                                <span class="instrument-label">人均投入</span>
+                            </div>
+                            <div class="instrument-readout" id="analyticsAvgSpent">¥0</div>
+                            <div class="instrument-bar"><div class="instrument-bar-fill"></div></div>
+                            <div class="analytics-change" id="analyticsSpentRange">--</div>
+                        </div>
+                        <div class="analytics-summary-card" data-accent="slate">
+                            <div class="instrument-glow"></div>
+                            <div class="instrument-head">
+                                <span class="instrument-icon">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>
+                                </span>
+                                <span class="instrument-label">日均活跃</span>
+                            </div>
+                            <div class="instrument-readout" id="analyticsDailyActive">0</div>
+                            <div class="instrument-bar"><div class="instrument-bar-fill"></div></div>
+                            <div class="analytics-change" id="analyticsPeakHour">--</div>
+                        </div>
+                    </div>
+
+                    <!-- Charts Row 1 -->
+                    <div class="analytics-charts-row">
+                        <div class="waveform-card glass">
+                            <div class="waveform-header">
+                                <span class="waveform-title">用户增长趋势</span>
+                                <span class="waveform-subtitle" id="growthSubtitle">近 30 天</span>
+                            </div>
+                            <div class="waveform-body">
+                                <canvas id="growthChart"></canvas>
+                            </div>
+                        </div>
+                        <div class="waveform-card glass">
+                            <div class="waveform-header">
+                                <span class="waveform-title">活跃度分布</span>
+                                <span class="waveform-subtitle">操作类型占比</span>
+                            </div>
+                            <div class="waveform-body">
+                                <canvas id="activityChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Charts Row 2 -->
+                    <div class="analytics-charts-row">
+                        <div class="waveform-card glass">
+                            <div class="waveform-header">
+                                <span class="waveform-title">资产分布</span>
+                                <span class="waveform-subtitle">消费区间统计</span>
+                            </div>
+                            <div class="waveform-body">
+                                <canvas id="assetsChart"></canvas>
+                            </div>
+                        </div>
+                        <div class="waveform-card glass">
+                            <div class="waveform-header">
+                                <span class="waveform-title">活跃时段</span>
+                                <span class="waveform-subtitle">24 小时分布</span>
+                            </div>
+                            <div class="waveform-body">
+                                <canvas id="peakHoursChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Top Spenders Table -->
+                    <div class="section-sub-header">
+                        <span class="waveform-title">消费排行</span>
+                        <span class="waveform-subtitle">Top 10</span>
+                    </div>
+                    <div class="manifest-panel glass">
+                        <div class="manifest-header">
+                            <div class="manifest-row manifest-thead">
+                                <span class="manifest-cell col-rank">#</span>
+                                <span class="manifest-cell col-spender-user">用户</span>
+                                <span class="manifest-cell col-spender-items">物品数</span>
+                                <span class="manifest-cell col-spender-total">总投入</span>
+                            </div>
+                        </div>
+                        <div class="manifest-body" id="topSpendersList"></div>
+                    </div>
+                </section>
+
+                <!-- Settings Section (Phase 4) -->
+                <section id="section-settings" class="admin-section">
+                    <div class="section-header">
+                        <h2>系统设置</h2>
+                    </div>
+
+                    <!-- System Info Cards -->
+                    <div class="settings-info-grid">
+                        <div class="settings-info-card glass">
+                            <div class="settings-info-label">版本</div>
+                            <div class="settings-info-value" id="settingsVersion">-</div>
+                        </div>
+                        <div class="settings-info-card glass">
+                            <div class="settings-info-label">运行环境</div>
+                            <div class="settings-info-value" id="settingsEnv">-</div>
+                        </div>
+                        <div class="settings-info-card glass">
+                            <div class="settings-info-label">数据库大小</div>
+                            <div class="settings-info-value" id="settingsDbSize">-</div>
+                        </div>
+                        <div class="settings-info-card glass">
+                            <div class="settings-info-label">内存占用</div>
+                            <div class="settings-info-value" id="settingsMemUsage">-</div>
+                        </div>
+                        <div class="settings-info-card glass">
+                            <div class="settings-info-label">运行时间</div>
+                            <div class="settings-info-value" id="settingsUptime">-</div>
+                        </div>
+                        <div class="settings-info-card glass">
+                            <div class="settings-info-label">备份文件</div>
+                            <div class="settings-info-value" id="settingsBackupCount">-</div>
+                        </div>
+                    </div>
+
+                    <!-- Settings Form -->
+                    <div class="settings-form-card glass">
+                        <div class="settings-form-header">
+                            <h3>系统参数</h3>
+                        </div>
+                        <div class="settings-form-body">
+                            <div class="setting-row">
+                                <div class="setting-info">
+                                    <label for="settingSiteName" class="setting-label">站点名称</label>
+                                    <span class="setting-desc">显示在页面标题和导航栏</span>
+                                </div>
+                                <input type="text" id="settingSiteName" class="setting-input" placeholder="DayCost">
+                            </div>
+                            <div class="setting-row">
+                                <div class="setting-info">
+                                    <label class="setting-label">允许注册</label>
+                                    <span class="setting-desc">新用户是否可以自行注册账号</span>
+                                </div>
+                                <label class="setting-toggle">
+                                    <input type="checkbox" id="settingRegistration">
+                                    <span class="setting-toggle-slider"></span>
+                                </label>
+                            </div>
+                            <div class="setting-row">
+                                <div class="setting-info">
+                                    <label class="setting-label">维护模式</label>
+                                    <span class="setting-desc">开启后普通用户无法访问系统</span>
+                                </div>
+                                <label class="setting-toggle">
+                                    <input type="checkbox" id="settingMaintenance">
+                                    <span class="setting-toggle-slider"></span>
+                                </label>
+                            </div>
+                            <div class="setting-row">
+                                <div class="setting-info">
+                                    <label for="settingMaxRecords" class="setting-label">每用户最大记录数</label>
+                                    <span class="setting-desc">0 表示不限制</span>
+                                </div>
+                                <input type="number" id="settingMaxRecords" class="setting-input" min="0" placeholder="0">
+                            </div>
+                            <div class="setting-row">
+                                <div class="setting-info">
+                                    <label for="settingSessionTimeout" class="setting-label">会话超时（天）</label>
+                                    <span class="setting-desc">登录 Token 有效期</span>
+                                </div>
+                                <input type="number" id="settingSessionTimeout" class="setting-input" min="1" placeholder="7">
+                            </div>
+                        </div>
+                        <div class="settings-form-footer">
+                            <button id="settingsSaveBtn" class="admin-btn">保存设置</button>
+                        </div>
+                    </div>
+
+                    <!-- Backup Management -->
+                    <div class="settings-action-card glass">
+                        <div class="settings-action-header">
+                            <h3>数据备份</h3>
+                            <button id="createBackupBtn" class="admin-btn">创建备份</button>
+                        </div>
+                        <div class="backup-list" id="backupList">
+                            <div class="manifest-empty">暂无备份</div>
+                        </div>
+                    </div>
+
+                    <!-- Cache Management -->
+                    <div class="settings-action-card glass">
+                        <div class="settings-action-header">
+                            <h3>缓存管理</h3>
+                            <button id="clearCacheBtn" class="admin-btn secondary-btn">清理缓存</button>
+                        </div>
+                        <div class="cache-info">
+                            <div class="cache-info-row">
+                                <span class="cache-info-label">当前数据库大小</span>
+                                <span class="cache-info-value" id="cacheDbSize">-</span>
+                            </div>
+                            <div class="cache-info-row">
+                                <span class="cache-info-label">上次清理</span>
+                                <span class="cache-info-value" id="cacheLastClear">-</span>
+                            </div>
+                        </div>
                     </div>
                 </section>
 
@@ -196,6 +512,44 @@
                 </section>
             </main>
         </div>
+
+        <!-- User Detail Drawer -->
+        <div id="userDrawer" class="drawer hidden">
+            <div class="drawer-overlay" id="drawerOverlay"></div>
+            <div class="drawer-content glass">
+                <div class="drawer-header">
+                    <h3 id="drawerTitle">用户详情</h3>
+                    <button id="drawerCloseBtn" class="drawer-close">&times;</button>
+                </div>
+                <div class="drawer-body" id="drawerBody">
+                    <div class="drawer-loading">加载中...</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Bottom Tab Bar (Mobile) -->
+        <nav class="admin-bottom-tabs">
+            <button class="admin-tab-item active" data-section="overview">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
+                <span>概览</span>
+            </button>
+            <button class="admin-tab-item" data-section="users">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+                <span>用户</span>
+            </button>
+            <button class="admin-tab-item" data-section="analytics">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>
+                <span>洞察</span>
+            </button>
+            <button class="admin-tab-item" data-section="settings">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+                <span>设置</span>
+            </button>
+            <button class="admin-tab-item" data-section="logs">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+                <span>日志</span>
+            </button>
+        </nav>
     </div>
 
     <!-- Temp Password Modal -->
@@ -206,8 +560,20 @@
             <div class="temp-pwd-display">
                 <code id="tempPwdValue"></code>
             </div>
-            <p class="modal-message" style="font-size:0.8rem;color:#94a3b8">用户 <strong id="tempPwdUsername"></strong> 需使用此密码登录后修改。</p>
+            <p class="modal-message" style="font-size:0.8rem;color:var(--text-muted)">用户 <strong id="tempPwdUsername"></strong> 需使用此密码登录后修改。</p>
             <button id="tempPwdCloseBtn" class="admin-btn">确定</button>
+        </div>
+    </div>
+
+    <!-- Confirm Dialog (replaces native confirm) -->
+    <div id="confirmDialog" class="modal-overlay hidden">
+        <div class="modal-content glass small-modal">
+            <h2 id="confirmTitle">确认操作</h2>
+            <p class="modal-message" id="confirmMessage"></p>
+            <div class="confirm-actions">
+                <button id="confirmCancelBtn" class="admin-btn secondary-btn">取消</button>
+                <button id="confirmOkBtn" class="admin-btn">确认</button>
+            </div>
         </div>
     </div>
 
@@ -224,6 +590,8 @@
         <div class="auth-gate-text">验证权限中...</div>
     </div>
 
+    <!-- Toast Component -->
+    <script src="/js/toast.js"></script>
     <script src="admin.js"></script>
 </body>
 </html>
