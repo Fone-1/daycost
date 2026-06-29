@@ -19,8 +19,9 @@
   },
   "parserOptions": {
     "ecmaVersion": 2022,
-    "sourceType": "commonjs"
+    "sourceType": "module"
   },
+  "extends": ["prettier"],
   "rules": {
     "no-unused-vars": ["warn", { "argsIgnorePattern": "^_" }],
     "no-undef": "error",

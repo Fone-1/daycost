@@ -1,0 +1,24 @@
+sequenceDiagram
+    participant User as 用户
+    participant RV as RankingView
+    participant Api as ApiClient
+    participant Server as Express StatsRouter
+    participant Tree as treeHelper
+    participant DB as SQLite
+
+    Note over User,DB: 用户切换到统计Tab → 排行榜子视图
+    RV->>Api: GET /api/stats/ranking?limit=20&status=active
+    Api->>Server: request with JWT
+    Server->>Tree: getFilteredTreeRecords(userId, {status: 'active'}, db)
+    Tree->>DB: SELECT * FROM v_records_computed WHERE user_id=? AND is_deleted=0
+    DB-->>Tree: all records
+    Tree->>Tree: build tree + aggregate + filter by status
+    Tree-->>Server: {filteredTopLevel, childrenMap}
+    Server->>Server: sort filteredTopLevel by _aggDailyCost DESC
+    Server->>Server: map to ranking entries {id, item_name, dailyCost, price, days, status}
+    Server-->>Api: {data: rankingArray}
+    Api-->>RV: ranking data
+
+    RV->>RV: renderTable() — 排行表格（颜色编码：红/黄/绿）
+    RV->>RV: renderChart() — Chart.js水平柱状图
+    RV->>User: 显示排行榜视图

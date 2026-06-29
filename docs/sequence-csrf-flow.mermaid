@@ -1,0 +1,30 @@
+sequenceDiagram
+    participant Client as 前端ApiClient
+    participant Server as Express Server
+    participant CSRF as CSRFMiddleware
+    participant Auth as AuthRouter
+    participant DB as SQLite
+
+    Note over Client,Server: 1. 首次加载页面
+    Client->>Server: GET /api/auth/csrf-token
+    Server->>CSRF: generateToken()
+    CSRF-->>Server: csrfToken = crypto.randomBytes(32).hex
+    Server->>Client: Response {csrfToken} + Set-Cookie: _csrf=xxx
+    Client->>Client: apiClient.setCsrfToken(csrfToken)
+
+    Note over Client,Server: 2. 登录
+    Client->>Server: POST /api/auth/login {username, password} + X-CSRF-Token header
+    Server->>CSRF: validate(req) — 比对 cookie._csrf === header.X-CSRF-Token
+    CSRF-->>Server: valid=true
+    Server->>Auth: authenticate user
+    Auth->>DB: SELECT * FROM users WHERE username=?
+    DB-->>Auth: user record
+    Auth->>Auth: bcrypt.compare + generateJWT
+    Auth->>Client: Response {token, username, role} + Set-Cookie: _csrf=newToken
+
+    Note over Client,Server: 3. 后续 mutating 请求
+    Client->>Server: POST /api/records {data} + Authorization: Bearer JWT + X-CSRF-Token + Cookie: _csrf
+    Server->>CSRF: validate(req)
+    CSRF-->>Server: valid=true → next()
+    Server->>Server: process request
+    Server->>Client: Response {result}

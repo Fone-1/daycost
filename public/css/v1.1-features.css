@@ -1,0 +1,813 @@
+/* DayCost v1.1 Features CSS
+ * Onboarding + Empty State + Ranking + TOTP Codes + Share Card
+ * Uses design system variables from design-system.css
+ *
+ * Version: 1.1.0
+ */
+
+/* ============================================
+   1. ONBOARDING — 新手引导
+   ============================================ */
+
+.onboarding-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 9997;
+  pointer-events: auto;
+}
+
+.onboarding-highlight {
+  position: fixed;
+  border-radius: 8px;
+  transition: all 300ms cubic-bezier(0.4, 0, 0.2, 1);
+  pointer-events: none;
+}
+
+.onboarding-step-card {
+  position: fixed;
+  width: 340px;
+  max-width: calc(100vw - 32px);
+  background-color: var(--color-bg-elevated, #1e293b);
+  border: 1px solid var(--color-border-primary, #334155);
+  border-radius: var(--radius-xl, 16px);
+  padding: var(--space-6, 24px);
+  box-shadow: var(--shadow-2xl, 0 25px 50px -12px rgba(0,0,0,0.25));
+  z-index: 9999;
+  font-family: var(--font-sans, 'DM Sans', system-ui, sans-serif);
+}
+
+.onboarding-step-icon {
+  display: flex;
+  justify-content: center;
+  margin-bottom: var(--space-4, 16px);
+}
+
+.onboarding-step-title {
+  font-size: var(--text-xl, 20px);
+  font-weight: var(--font-weight-semibold, 600);
+  color: var(--color-text-primary, #f1f5f9);
+  margin-bottom: var(--space-3, 12px);
+  text-align: center;
+}
+
+.onboarding-step-desc {
+  font-size: var(--text-sm, 14px);
+  line-height: var(--leading-relaxed, 1.625);
+  color: var(--color-text-secondary, #94a3b8);
+  margin-bottom: var(--space-5, 20px);
+  text-align: center;
+}
+
+.onboarding-indicator {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2, 8px);
+  margin-bottom: var(--space-5, 20px);
+}
+
+.onboarding-dots {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.onboarding-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background-color: var(--color-bg-tertiary, #334155);
+  transition: all 200ms ease;
+}
+
+.onboarding-dot.active {
+  background-color: var(--color-brand-primary, #f59e0b);
+  transform: scale(1.3);
+  box-shadow: 0 0 8px rgba(245, 158, 11, 0.4);
+}
+
+.onboarding-dot.past {
+  background-color: var(--color-brand-primary-soft, rgba(245, 158, 11, 0.3));
+}
+
+.onboarding-dot-line {
+  width: 24px;
+  height: 2px;
+  background-color: var(--color-bg-tertiary, #334155);
+  border-radius: 1px;
+}
+
+.onboarding-step-count {
+  font-size: var(--text-xs, 12px);
+  color: var(--color-text-tertiary, #64748b);
+  font-family: var(--font-mono, monospace);
+}
+
+.onboarding-step-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3, 12px);
+}
+
+.onboarding-skip-link {
+  font-size: var(--text-sm, 14px);
+  color: var(--color-text-tertiary, #64748b);
+  text-decoration: none;
+  cursor: pointer;
+  transition: color 150ms ease;
+}
+
+.onboarding-skip-link:hover {
+  color: var(--color-text-secondary, #94a3b8);
+}
+
+.onboarding-next-btn {
+  min-width: 120px;
+}
+
+/* ============================================
+   2. EMPTY STATE — 空状态组件
+   ============================================ */
+
+.empty-state-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-12, 48px) var(--space-6, 24px);
+  text-align: center;
+}
+
+.empty-state-illustration {
+  color: var(--color-text-tertiary, #64748b);
+  margin-bottom: var(--space-6, 24px);
+  opacity: 0.6;
+}
+
+.empty-state-text {
+  font-size: var(--text-lg, 18px);
+  font-weight: var(--font-weight-semibold, 600);
+  color: var(--color-text-primary, #f1f5f9);
+  margin-bottom: var(--space-2, 8px);
+}
+
+.empty-state-desc {
+  font-size: var(--text-sm, 14px);
+  color: var(--color-text-secondary, #94a3b8);
+  margin-bottom: var(--space-6, 24px);
+  max-width: 280px;
+}
+
+.empty-state-cta {
+  min-width: 160px;
+}
+
+/* Show-empty-state marker class */
+.show-empty-state .clusterize-content {
+  display: none;
+}
+
+/* ============================================
+   3. RANKING VIEW — 日成本排行榜
+   ============================================ */
+
+.ranking-view {
+  padding: var(--space-4, 16px) 0;
+}
+
+.ranking-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--space-4, 16px);
+  padding: 0 var(--space-2, 8px);
+}
+
+.ranking-header h3 {
+  font-size: var(--text-lg, 18px);
+  font-weight: var(--font-weight-semibold, 600);
+  color: var(--color-text-primary, #f1f5f9);
+  margin: 0;
+}
+
+.ranking-filter {
+  display: flex;
+  gap: var(--space-2, 8px);
+}
+
+.ranking-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2, 8px);
+}
+
+.ranking-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3, 12px);
+  padding: var(--space-3, 12px) var(--space-4, 16px);
+  background-color: var(--color-bg-elevated, #1e293b);
+  border: 1px solid var(--color-border-primary, #334155);
+  border-radius: var(--radius-lg, 12px);
+  transition: all 200ms ease;
+}
+
+.ranking-item:hover {
+  border-color: var(--color-border-secondary, #475569);
+  box-shadow: var(--shadow-md, 0 4px 6px -1px rgba(0,0,0,0.1));
+  transform: translateY(-1px);
+}
+
+/* Top 3 special styles */
+.ranking-item.gold {
+  border-color: rgba(245, 158, 11, 0.4);
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.08), var(--color-bg-elevated, #1e293b));
+}
+
+.ranking-item.silver {
+  border-color: rgba(148, 163, 184, 0.3);
+  background: linear-gradient(135deg, rgba(148, 163, 184, 0.06), var(--color-bg-elevated, #1e293b));
+}
+
+.ranking-item.bronze {
+  border-color: rgba(180, 83, 9, 0.3);
+  background: linear-gradient(135deg, rgba(180, 83, 9, 0.06), var(--color-bg-elevated, #1e293b));
+}
+
+/* Ranking badge */
+.ranking-badge {
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-full, 9999px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  background-color: var(--color-bg-tertiary, #334155);
+}
+
+.ranking-badge.gold {
+  background: linear-gradient(135deg, #fbbf24, #f59e0b);
+  box-shadow: 0 0 12px rgba(245, 158, 11, 0.3);
+}
+
+.ranking-badge.silver {
+  background: linear-gradient(135deg, #e2e8f0, #94a3b8);
+}
+
+.ranking-badge.bronze {
+  background: linear-gradient(135deg, #d97706, #92400e);
+}
+
+.ranking-badge-num {
+  font-size: var(--text-sm, 14px);
+  font-weight: var(--font-weight-bold, 700);
+  color: var(--color-text-primary, #f1f5f9);
+  font-family: var(--font-mono, monospace);
+}
+
+/* Ranking item main content */
+.ranking-item-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.ranking-item-name-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2, 8px);
+  margin-bottom: 4px;
+}
+
+.ranking-item-name {
+  font-size: var(--text-base, 16px);
+  font-weight: var(--font-weight-medium, 500);
+  color: var(--color-text-primary, #f1f5f9);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ranking-item-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--text-xs, 12px);
+  color: var(--color-text-tertiary, #64748b);
+  flex-wrap: wrap;
+}
+
+.ranking-meta-sep {
+  opacity: 0.5;
+}
+
+.ranking-tags {
+  display: inline-flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.ranking-tag-badge {
+  display: inline-block;
+  padding: 1px 6px;
+  border-radius: var(--radius-full, 9999px);
+  background-color: var(--color-brand-secondary-soft, rgba(59, 130, 246, 0.1));
+  color: var(--color-brand-secondary, #3b82f6);
+  font-size: 10px;
+  font-weight: 500;
+}
+
+/* Status badge */
+.ranking-status-badge {
+  display: inline-block;
+  padding: 1px 8px;
+  border-radius: var(--radius-full, 9999px);
+  font-size: 10px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.ranking-status-badge.active {
+  background-color: rgba(16, 185, 129, 0.15);
+  color: #10b981;
+}
+
+.ranking-status-badge.broken {
+  background-color: rgba(239, 68, 68, 0.15);
+  color: #ef4444;
+}
+
+.ranking-status-badge.sold {
+  background-color: rgba(245, 158, 11, 0.15);
+  color: #f59e0b;
+}
+
+/* Cost display */
+.ranking-item-cost {
+  flex-shrink: 0;
+  text-align: right;
+  display: flex;
+  align-items: baseline;
+  gap: 2px;
+}
+
+.ranking-cost-value {
+  font-size: var(--text-xl, 20px);
+  font-weight: var(--font-weight-bold, 700);
+  font-family: var(--font-mono, monospace);
+}
+
+.ranking-cost-unit {
+  font-size: var(--text-xs, 12px);
+  color: var(--color-text-tertiary, #64748b);
+}
+
+/* Color coding */
+.ranking-cost-high .ranking-cost-value {
+  color: #ef4444;
+}
+
+.ranking-cost-medium .ranking-cost-value {
+  color: #f59e0b;
+}
+
+.ranking-cost-low .ranking-cost-value {
+  color: #10b981;
+}
+
+/* Empty / loading states */
+.ranking-empty,
+.ranking-loading,
+.ranking-error {
+  text-align: center;
+  padding: var(--space-12, 48px) var(--space-6, 24px);
+  color: var(--color-text-tertiary, #64748b);
+  font-size: var(--text-sm, 14px);
+}
+
+.ranking-empty svg {
+  margin: 0 auto var(--space-4, 16px);
+  display: block;
+}
+
+.ranking-error {
+  color: #ef4444;
+}
+
+/* Ranking toggle button */
+#rankingToggleBtn {
+  background-color: var(--color-bg-tertiary, #334155);
+  color: var(--color-text-secondary, #94a3b8);
+  border: 1px solid var(--color-border-primary, #334155);
+  padding: 6px 14px;
+  border-radius: var(--radius-lg, 12px);
+  font-size: var(--text-sm, 14px);
+  cursor: pointer;
+  transition: all 200ms ease;
+}
+
+#rankingToggleBtn:hover {
+  border-color: var(--color-brand-primary, #f59e0b);
+  color: var(--color-brand-primary, #f59e0b);
+}
+
+#rankingToggleBtn.active {
+  background-color: var(--color-brand-primary, #f59e0b);
+  color: #fff;
+  border-color: var(--color-brand-primary, #f59e0b);
+}
+
+/* ============================================
+   4. TOTP CODES — 实时验证码面板
+   ============================================ */
+
+/* Card container — extends existing .totp-card */
+.totp-card.totp-expiring {
+  border-color: rgba(239, 68, 68, 0.4);
+  box-shadow: 0 0 12px rgba(239, 68, 68, 0.15);
+}
+
+/* Code row: code + copy button */
+.totp-code-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2, 8px);
+  margin: var(--space-2, 8px) 0;
+}
+
+/* Copy button */
+.totp-copy-btn {
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-md, 8px);
+  border: 1px solid var(--color-border-primary, #334155);
+  background-color: var(--color-bg-tertiary, #334155);
+  color: var(--color-text-secondary, #94a3b8);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 150ms ease;
+}
+
+.totp-copy-btn:hover {
+  border-color: var(--color-brand-primary, #f59e0b);
+  color: var(--color-brand-primary, #f59e0b);
+  background-color: rgba(245, 158, 11, 0.1);
+}
+
+.totp-copy-btn.copied {
+  background-color: rgba(16, 185, 129, 0.15);
+  border-color: #10b981;
+  color: #10b981;
+}
+
+/* Progress row: ring + remaining text */
+.totp-progress-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2, 8px);
+  margin-top: var(--space-1, 4px);
+}
+
+/* SVG progress ring */
+.totp-progress-ring {
+  flex-shrink: 0;
+}
+
+.totp-ring-fill {
+  transition: stroke-dashoffset 1s linear, stroke 0.3s ease;
+}
+
+/* Remaining seconds text */
+.totp-remaining {
+  font-size: var(--text-xs, 12px);
+  color: var(--color-text-tertiary, #64748b);
+  font-family: var(--font-mono, monospace);
+}
+
+.totp-remaining.expiring {
+  color: #ef4444;
+  font-weight: var(--font-weight-bold, 700);
+  animation: totp-pulse 1s ease-in-out infinite;
+}
+
+@keyframes totp-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+/* ============================================
+   5. SHARE CARD — 分享卡片
+   ============================================ */
+
+/* Preview modal */
+.share-card-modal {
+  max-width: 520px;
+  width: 90vw;
+}
+
+.share-card-preview-content {
+  display: flex;
+  justify-content: center;
+  padding: var(--space-4, 16px) 0;
+  margin-bottom: var(--space-4, 16px);
+}
+
+/* Card template — the actual card rendered to canvas */
+.share-card-template {
+  width: 320px;
+  border-radius: 20px;
+  overflow: hidden;
+  font-family: 'DM Sans', system-ui, sans-serif;
+}
+
+.share-card-inner {
+  display: flex;
+  flex-direction: column;
+  min-height: 480px;
+  padding: 0;
+  position: relative;
+}
+
+/* Theme variants */
+.share-card-theme-high {
+  background: linear-gradient(145deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+}
+
+.share-card-theme-medium {
+  background: linear-gradient(145deg, #1a1a2e 0%, #1e293b 50%, #312e4a 100%);
+}
+
+.share-card-theme-low {
+  background: linear-gradient(145deg, #0f2027 0%, #203a43 50%, #2c5364 100%);
+}
+
+/* Header */
+.share-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 24px 12px;
+}
+
+.share-card-logo {
+  font-size: 14px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.9);
+  letter-spacing: 0.5px;
+}
+
+.share-card-date {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.4);
+  font-family: monospace;
+}
+
+/* Body */
+.share-card-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  padding: 20px 24px;
+  text-align: center;
+}
+
+.share-card-item-name {
+  font-size: 22px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.95);
+  margin-bottom: 8px;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.share-card-tags {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  justify-content: center;
+  margin-bottom: 20px;
+}
+
+.share-card-tag {
+  display: inline-block;
+  padding: 2px 10px;
+  border-radius: 9999px;
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 11px;
+}
+
+/* Daily cost — the hero number */
+.share-card-daily-cost {
+  display: flex;
+  align-items: baseline;
+  gap: 2px;
+  margin-bottom: 24px;
+}
+
+.share-card-currency {
+  font-size: 28px;
+  font-weight: 600;
+  color: #f59e0b;
+}
+
+.share-card-amount {
+  font-size: 56px;
+  font-weight: 800;
+  color: #fbbf24;
+  font-family: monospace;
+  line-height: 1;
+  text-shadow: 0 0 30px rgba(251, 191, 36, 0.3);
+}
+
+.share-card-unit {
+  font-size: 18px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+/* Meta info */
+.share-card-meta {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding: 16px 24px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.share-card-meta-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.share-card-meta-label {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.4);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.share-card-meta-value {
+  font-size: 16px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.9);
+  font-family: monospace;
+}
+
+.share-card-meta-divider {
+  width: 1px;
+  height: 30px;
+  background: rgba(255, 255, 255, 0.15);
+}
+
+/* Footer */
+.share-card-footer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 16px 24px 20px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.share-card-watermark {
+  font-size: 13px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.5);
+  letter-spacing: 0.5px;
+}
+
+.share-card-watermark-sub {
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.25);
+  margin-top: 2px;
+}
+
+/* Button group */
+.share-card-btn-group {
+  display: flex;
+  gap: var(--space-3, 12px);
+  justify-content: center;
+}
+
+/* ============================================
+   6. RESPONSIVE — 响应式适配
+   ============================================ */
+
+/* Share button in record list */
+.share-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 14px;
+  border-radius: var(--radius-md, 8px);
+  font-size: var(--text-sm, 14px);
+  font-weight: 500;
+  cursor: pointer;
+  border: 1px solid var(--color-border-secondary, #475569);
+  background-color: transparent;
+  color: var(--color-text-secondary, #94a3b8);
+  transition: all 150ms ease;
+  white-space: nowrap;
+}
+
+.share-btn:hover {
+  border-color: var(--color-brand-secondary, #3b82f6);
+  color: var(--color-brand-secondary, #3b82f6);
+  background-color: var(--color-brand-secondary-soft, rgba(59, 130, 246, 0.1));
+}
+
+/* Stats header actions container */
+.stats-header-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2, 8px);
+}
+
+@media (max-width: 640px) {
+  /* Onboarding */
+  .onboarding-step-card {
+    width: calc(100vw - 32px);
+  }
+
+  /* Ranking */
+  .ranking-item {
+    padding: var(--space-2, 8px) var(--space-3, 12px);
+  }
+
+  .ranking-badge {
+    width: 32px;
+    height: 32px;
+  }
+
+  .ranking-cost-value {
+    font-size: var(--text-lg, 18px);
+  }
+
+  .ranking-item-meta {
+    font-size: 10px;
+  }
+
+  /* Share card */
+  .share-card-template {
+    width: 280px;
+  }
+
+  .share-card-amount {
+    font-size: 48px;
+  }
+
+  .share-card-btn-group {
+    flex-direction: column;
+  }
+}
+
+/* ============================================
+   7. ONBOARDING OVERLAY ANIMATION
+   ============================================ */
+
+.onboarding-overlay .animate-scale-in {
+  animation: onboardingScaleIn 400ms cubic-bezier(0.34, 1.56, 0.64, 1) ease-out;
+}
+
+@keyframes onboardingScaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.9) translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+/* Onboarding centered card animation */
+.onboarding-step-card[style*="translate(-50%, -50%)"].animate-scale-in {
+  animation: onboardingCenterScaleIn 400ms cubic-bezier(0.34, 1.56, 0.64, 1) ease-out;
+}
+
+@keyframes onboardingCenterScaleIn {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+}

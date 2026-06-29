@@ -14,6 +14,8 @@
 
     // --- TOTP ---
     let totpRefreshInterval = null;
+    let totpCodesCache = null;
+    let totpLastFetchTime = 0;
     let totpCurrentGroup = null; // null = all
     const totpPendingGroups = []; // groups created by user but not yet in DB
 
@@ -245,12 +247,40 @@
             const res = await fetch(url, { headers: getHeaders() });
             if (!res.ok) return;
             const codes = await res.json();
+            totpCodesCache = codes;
+            totpLastFetchTime = Date.now();
             renderTOTPCards(codes);
             clearInterval(totpRefreshInterval);
-            totpRefreshInterval = setInterval(loadTOTPCodes, 1000);
+            totpRefreshInterval = setInterval(updateTotpCountdown, 1000);
         } catch (e) {
             console.error('TOTP load failed', e);
         }
+    }
+
+    function updateTotpCountdown() {
+        if (!totpCodesCache || totpCodesCache.length === 0) return;
+
+        const elapsed = Math.floor((Date.now() - totpLastFetchTime) / 1000);
+        let needsRefresh = false;
+
+        const updatedCodes = totpCodesCache.map(c => {
+            const _period = Number(c.period) || 30;
+            const originalRemaining = Number(c.remaining) || 0;
+            const newRemaining = originalRemaining - elapsed;
+
+            if (newRemaining <= 0) {
+                needsRefresh = true;
+            }
+
+            return { ...c, remaining: Math.max(0, newRemaining) };
+        });
+
+        if (needsRefresh) {
+            loadTOTPCodes();
+            return;
+        }
+
+        renderTOTPCards(updatedCodes);
     }
 
     function renderTOTPCards(codes) {
@@ -267,13 +297,16 @@
 
         container.innerHTML = codes.map(c => {
             const period = Number(c.period) || 30;
-            const pct = (c.remaining / period) * 100;
+            const remaining = Number(c.remaining) || 0;
+            const pct = remaining / period;
+            const circumference = 2 * Math.PI * 14; // r=14
+            const dashOffset = circumference * (1 - pct);
             const formattedCode = String(c.code).replace(/(.{3})(?=.)/g, '$1 ');
-            let colorClass = 'green';
-            if (c.remaining <= 5) colorClass = 'red';
-            else if (c.remaining <= 10) colorClass = 'yellow';
+            const isExpiring = remaining <= 5;
+            const ringColor = isExpiring ? '#ef4444' : (remaining <= 10 ? '#f59e0b' : '#10b981');
+
             return `
-                <div class="totp-card">
+                <div class="totp-card ${isExpiring ? 'totp-expiring' : ''}">
                     <div class="totp-card-header">
                         <div>
                             <div class="totp-label" title="${escapeHtml(c.label)}">${escapeHtml(c.label)}</div>
@@ -284,11 +317,29 @@
                             <button class="totp-delete-btn" data-totp-id="${c.id}" title="删除">🗑️</button>
                         </div>
                     </div>
-                    <div class="totp-code" data-totp-code="${c.code}" title="点击复制">${formattedCode}</div>
-                    <div class="totp-progress-bar"><div class="totp-progress-fill ${colorClass}" style="width:${pct}%"></div></div>
+                    <div class="totp-code-row">
+                        <div class="totp-code" data-totp-code="${c.code}" title="点击复制">${formattedCode}</div>
+                        <button class="totp-copy-btn" data-totp-code="${c.code}" title="复制验证码" aria-label="复制验证码">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <rect x="9" y="9" width="13" height="13" rx="2"/>
+                                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+                            </svg>
+                        </button>
+                    </div>
+                    <div class="totp-progress-row">
+                        <svg class="totp-progress-ring" width="36" height="36" viewBox="0 0 36 36">
+                            <circle cx="18" cy="18" r="14" fill="none" stroke="rgba(148,163,184,0.2)" stroke-width="3"/>
+                            <circle class="totp-ring-fill" cx="18" cy="18" r="14" fill="none"
+                                stroke="${ringColor}" stroke-width="3" stroke-linecap="round"
+                                stroke-dasharray="${circumference.toFixed(2)}"
+                                stroke-dashoffset="${dashOffset.toFixed(2)}"
+                                transform="rotate(-90 18 18)"
+                                style="transition: stroke-dashoffset 1s linear, stroke 0.3s ease;"/>
+                        </svg>
+                        <span class="totp-remaining ${isExpiring ? 'expiring' : ''}">${remaining}s</span>
+                    </div>
                     <div class="totp-card-footer">
                         <span class="totp-group-tag">${escapeHtml(c.group || '默认分组')}</span>
-                        <span class="totp-remaining">${c.remaining}s</span>
                     </div>
                 </div>
             `;
@@ -299,6 +350,22 @@
     const totpContainer = document.getElementById('totpCodesContainer');
     if (totpContainer) {
         totpContainer.addEventListener('click', async (e) => {
+            const copyBtn = e.target.closest('.totp-copy-btn');
+            if (copyBtn) {
+                const code = copyBtn.dataset.totpCode;
+                try {
+                    await navigator.clipboard.writeText(code);
+                    copyBtn.classList.add('copied');
+                    setTimeout(() => copyBtn.classList.remove('copied'), 1000);
+                    if (window.toast) window.toast.success('验证码已复制');
+                } catch (err) {
+                    const range = document.createRange();
+                    range.selectNodeContents(copyBtn);
+                    window.getSelection().removeAllRanges();
+                    window.getSelection().addRange(range);
+                }
+                return;
+            }
             const codeEl = e.target.closest('.totp-code');
             if (codeEl) {
                 const code = codeEl.dataset.totpCode;
@@ -306,6 +373,7 @@
                     await navigator.clipboard.writeText(code);
                     codeEl.classList.add('copied');
                     setTimeout(() => codeEl.classList.remove('copied'), 1000);
+                    if (window.toast) window.toast.success('验证码已复制');
                 } catch (err) {
                     const range = document.createRange();
                     range.selectNodeContents(codeEl);

@@ -1,0 +1,23 @@
+sequenceDiagram
+    participant User as 用户
+    participant Card as ShareCardGenerator
+    participant DOM as DOM节点
+    participant H2C as html2canvas
+    participant Clipboard as navigator.clipboard
+
+    Note over User,Clipboard: 用户在记录详情中点击"分享"
+    Card->>DOM: 创建临时分享卡片DOM（物品名+¥/天+DayCost水印）
+    Card->>DOM: 设置尺寸为社交分享尺寸（1080x1080或640x640）
+    Card->>H2C: html2canvas(tempElement, {scale: 2, useCORS: true})
+    H2C-->>Card: Canvas对象
+    Card->>Card: addWatermark(canvas) — 底部水印条"DayCost · 日摊成本看板"
+    Card->>Card: canvas.toBlob('image/png')
+
+    alt 用户选择下载
+        Card->>User: 创建<a download="daycost-share.png">触发下载
+    else 用户选择复制
+        Card->>Clipboard: clipboard.write([new ClipboardItem({blob})])
+        Card->>User: Toast提示"已复制到剪贴板"
+    end
+
+    Card->>DOM: 移除临时DOM节点

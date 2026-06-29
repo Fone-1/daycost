@@ -15,6 +15,7 @@
 
     <script src="js/theme-preload.js?v=1"></script>
     <link rel="stylesheet" href="style.css?v=11">
+    <link rel="stylesheet" href="css/v1.1-features.css?v=1">
     <link rel="stylesheet" href="/clusterize.min.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -116,7 +117,10 @@
                             <h2>统计分析</h2>
                             <p id="statsLinkLabel">当前图表跟随账本列表筛选。</p>
                         </div>
-                        <button id="statsClearFilterBtn" class="btn-small">清除联动筛选</button>
+                        <div class="stats-header-actions">
+                            <button id="statsClearFilterBtn" class="btn-small">清除联动筛选</button>
+                            <button id="rankingToggleBtn" class="btn-small">排行榜</button>
+                        </div>
                     </div>
                     <div class="stats-view-tabs" id="statsViewTabs" role="tablist" aria-label="统计视图">
                         <button class="stats-view-btn active" data-stats-view="tag" role="tab" aria-selected="true">按标签</button>
@@ -164,6 +168,20 @@
                         <h3 id="chartTitle" class="vertical-chart-title">成本排名</h3>
                         <canvas id="costChart"></canvas>
                     </div>
+                </div>
+
+                <!-- Ranking View Container (hidden by default) -->
+                <div id="rankingViewContainer" class="ranking-view hidden">
+                    <div class="ranking-header">
+                        <h3>日成本排行榜</h3>
+                        <div class="ranking-filter">
+                            <select id="rankingStatusFilter" class="sort-select filter-select">
+                                <option value="active">使用中</option>
+                                <option value="all">全部状态</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div id="rankingListContainer" class="ranking-list"></div>
                 </div>
 
                 <!-- Progressive Disclosure Toggle -->
@@ -525,6 +543,8 @@
 
     <div id="globalTooltip" class="tooltip"></div>
 
+    <!-- Onboarding overlay container (dynamically populated by onboarding.js) -->
+
     <div id="passwordModal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-label="修改密码">
         <div class="modal-content glass small-modal">
             <button class="modal-close" id="passwordModalCloseBtn" aria-label="关闭">&times;</button>
@@ -739,6 +759,7 @@
     <script src="/clusterize.min.js"></script>
     <script src="/chart.min.js"></script>
     <script src="jsQR.min.js"></script>
+    <script src="html2canvas.min.js?v=1"></script>
     <script src="js/mobile-swipe.js?v=1"></script>
     <script src="js/toast.js?v=2"></script>
     <script src="js/state-manager.js?v=1"></script>
@@ -747,7 +768,7 @@
     <script src="js/batch-manager.js?v=1"></script>
     <script src="js/totp.js?v=1"></script>
     <script src="settings.js?v=1"></script>
-    <script src="script.js?v=11"></script>
+    <script type="module" src="js/app.js?v=1"></script>
     <script src="js/theme.js?v=1"></script>
 </body>
 </html>

@@ -200,4 +200,36 @@ router.get('/pie', authenticateToken, async (req, res) => {
     }
 });
 
+router.get('/ranking', authenticateToken, async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const limit = parseInt(req.query.limit, 10) || 20;
+        const statusFilter = req.query.status || 'active';
+
+        // Get all user records with computed daily cost
+        const { allMatchedRecords } = await getFilteredTreeRecords(userId, { status: statusFilter }, db);
+
+        // Sort by daily cost descending
+        const sorted = allMatchedRecords
+            .filter(r => (statusFilter === 'all' || (r.status || 'active') === statusFilter))
+            .sort((a, b) => b._dailyCost - a._dailyCost)
+            .slice(0, limit);
+
+        const data = sorted.map(r => ({
+            id: r.id,
+            item_name: r.item_name,
+            dailyCost: parseFloat(r._dailyCost.toFixed(2)),
+            price: r.price,
+            days: r._days,
+            status: r.status || 'active',
+            tags: r.tags || ''
+        }));
+
+        res.json({ data });
+    } catch (err) {
+        console.error("API Ranking Error:", err);
+        res.status(500).json({ error: '获取排行榜数据失败' });
+    }
+});
+
 module.exports = router;

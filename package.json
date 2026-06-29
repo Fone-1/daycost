@@ -1,28 +1,62 @@
 {
   "name": "daycost",
   "version": "1.0.0",
-  "description": "",
+  "description": "DayCost — 日摊成本计算工具，揭示物品持有期的隐性代价",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "eslint src/ public/js/ --ext .js",
+    "format": "prettier --write \"src/**/*.js\" \"public/js/**/*.js\" \"test/**/*.js\"",
+    "prepare": "husky",
     "start": "node server.js"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
+  "keywords": [
+    "expense",
+    "amortized-cost",
+    "asset-tracking",
+    "totp",
+    "daily-cost",
+    "cost-awareness"
+  ],
+  "author": "DayCost Contributors",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/daycost/daycost.git"
+  },
+  "lint-staged": {
+    "src/**/*.js": [
+      "eslint --fix",
+      "prettier --write"
+    ],
+    "public/js/**/*.js": [
+      "eslint --fix",
+      "prettier --write"
+    ]
+  },
   "dependencies": {
     "bcrypt": "^6.0.0",
+    "cookie": "^0.6.0",
     "cors": "^2.8.6",
     "express": "^5.2.1",
     "express-rate-limit": "^7.1.5",
     "helmet": "^7.1.0",
+    "html2canvas": "^1.4.1",
     "jsonwebtoken": "^9.0.3",
     "multer": "^2.1.1",
     "sqlite3": "^6.0.1",
+    "swagger-jsdoc": "^6.3.0",
+    "swagger-ui-express": "^5.0.1",
     "xss": "^1.0.15"
   },
   "devDependencies": {
     "eslint": "^8.57.1",
-    "node-gyp": "^12.3.0"
+    "eslint-config-prettier": "^9.1.0",
+    "husky": "^9.1.0",
+    "lint-staged": "^15.2.0",
+    "node-gyp": "^12.3.0",
+    "prettier": "^3.3.0",
+    "vitest": "^3.2.1"
   }
 }

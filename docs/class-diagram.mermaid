@@ -1,0 +1,170 @@
+classDiagram
+    class ApiClient {
+        +baseUrl: string
+        +csrfToken: string
+        +get(path, params): Promise
+        +post(path, body): Promise
+        +put(path, body): Promise
+        +delete(path): Promise
+        +setCsrfToken(token): void
+        +handleError(response): Error
+    }
+
+    class StateManager {
+        +state: Object
+        +listeners: Map
+        +subscribe(key, callback): void
+        +setState(key, value): void
+        +getState(key): any
+        +notify(key): void
+    }
+
+    class OnboardingFlow {
+        +currentStep: number
+        +steps: Array~OnboardingStep~
+        +containerEl: HTMLElement
+        +start(): void
+        +nextStep(): void
+        +prevStep(): void
+        +complete(): void
+        +isCompleted(): boolean
+        +saveProgress(): void
+        +renderStep(step): void
+    }
+
+    class OnboardingStep {
+        +title: string
+        +description: string
+        +illustration: string
+        +ctaText: string
+        +ctaAction: Function
+    }
+
+    class EmptyStateRenderer {
+        +configs: Map~string, EmptyStateConfig~
+        +show(containerId, configKey): void
+        +hide(containerId): void
+        +render(config): HTMLElement
+    }
+
+    class EmptyStateConfig {
+        +icon: string
+        +title: string
+        +description: string
+        +ctaText: string
+        +ctaAction: Function
+    }
+
+    class ShareCardGenerator {
+        +record: Object
+        +containerEl: HTMLElement
+        +generate(record): Promise~Blob~
+        +addWatermark(canvas): void
+        +download(blob): void
+        +copyToClipboard(blob): void
+    }
+
+    class TotpCodePanel {
+        +codes: Array~TotpCodeEntry~
+        +containerEl: HTMLElement
+        +refreshInterval: number
+        +fetchCodes(): Promise
+        +renderCodes(): void
+        +startAutoRefresh(): void
+        +stopAutoRefresh(): void
+        +copyCode(entryId): void
+        +renderProgressRing(remaining, period): SVGElement
+    }
+
+    class TotpCodeEntry {
+        +id: number
+        +label: string
+        +issuer: string
+        +code: string
+        +remaining: number
+        +period: number
+        +digits: number
+    }
+
+    class RankingView {
+        +data: Array~RankingEntry~
+        +containerEl: HTMLElement
+        +fetchRanking(params): Promise
+        +renderTable(): void
+        +renderChart(): void
+        +getColorCode(dailyCost): string
+    }
+
+    class RankingEntry {
+        +id: number
+        +item_name: string
+        +dailyCost: number
+        +price: number
+        +days: number
+        +status: string
+    }
+
+    class PasswordValidator {
+        +MIN_LENGTH: number = 8
+        +validate(password): ValidationResult
+        +getStrength(password): string
+        +getErrors(password): Array~string~
+    }
+
+    class ValidationResult {
+        +valid: boolean
+        +errors: Array~string~
+        +strength: string
+    }
+
+    class CSRFMiddleware {
+        +COOKIE_NAME: string = "_csrf"
+        +HEADER_NAME: string = "X-CSRF-Token"
+        +generateToken(): string
+        +setCookie(res, token): void
+        +validate(req): boolean
+    }
+
+    class Validators {
+        +validatePassword(password): Object
+        +MIN_LENGTH: int = 8
+        +REQUIRE_UPPERCASE: bool = true
+        +REQUIRE_DIGIT: bool = true
+    }
+
+    class EnvConfig {
+        +JWT_SECRET: string
+        +TOTP_ENCRYPTION_KEY: string
+        +PORT: int
+        +HTTPS_PORT: int
+        +DB_PATH: string
+        +CORS_ORIGIN: string
+        +CSRF_SECRET: string
+        +ensureRequiredEnv(): void
+        +persistDevTotpKey(): void
+    }
+
+    class StatsRouter {
+        +getSummary(req, res): void
+        +getTrend(req, res): void
+        +getPie(req, res): void
+        +getRanking(req, res): void
+    }
+
+    class SwaggerRouter {
+        +serveUI(req, res): void
+        +serveSpec(req, res): void
+    }
+
+    ApiClient --> StateManager : uses
+    OnboardingFlow --> OnboardingStep : contains
+    EmptyStateRenderer --> EmptyStateConfig : uses
+    TotpCodePanel --> TotpCodeEntry : contains
+    RankingView --> RankingEntry : contains
+    ShareCardGenerator --> ApiClient : uses
+    TotpCodePanel --> ApiClient : uses
+    RankingView --> ApiClient : uses
+    PasswordValidator --> ValidationResult : returns
+    Validators --> EnvConfig : standalone
+    CSRFMiddleware --> EnvConfig : uses CSRF_SECRET
+    StatsRouter --> Validators : uses

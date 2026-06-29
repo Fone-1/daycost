@@ -1,0 +1,29 @@
+sequenceDiagram
+    participant User as 用户
+    participant Panel as TotpCodePanel
+    participant Api as ApiClient
+    participant Server as Express
+    participant TotpH as totpHelper
+    participant DB as SQLite
+
+    Note over User,DB: 密钥Tab激活
+    Panel->>Api: GET /api/totp/codes
+    Api->>Server: request with JWT
+    Server->>DB: SELECT * FROM totp_entries WHERE user_id=?
+    DB-->>Server: entries array
+    Server->>TotpH: decryptSecret + generateTOTP for each
+    TotpH-->>Server: [{id, label, code, remaining, period}]
+    Server-->>Api: codes array
+    Api-->>Panel: codes data
+
+    Panel->>Panel: renderCodes() — SVG环形进度条 + 6位码
+    Panel->>Panel: startAutoRefresh() — setInterval(500ms)
+
+    loop 每500ms检查倒计时
+        Panel->>Panel: updateProgressRings() — SVG stroke-dashoffset动画
+        Panel->>Panel: 当 remaining <= 0 → fetchCodes() 重新获取
+    end
+
+    User->>Panel: 点击某码的"复制"按钮
+    Panel->>Panel: navigator.clipboard.writeText(code)
+    Panel->>User: Toast提示"已复制"

@@ -8,6 +8,10 @@ const db = require('../config/db');
 const { JWT_SECRET } = require('../config/env');
 const { authLimiter } = require('../middlewares/rateLimit');
 const { authenticateToken } = require('../middlewares/auth');
+const { validatePassword, validateUsername } = require('../utils/validators');
+const { generateToken, setCsrfCookie } = require('../middlewares/csrf');
+
+const BCRYPT_SALT_ROUNDS = 12;
 
 const router = express.Router();
 
@@ -56,8 +60,20 @@ router.post('/register', authLimiter, async (req, res) => {
     const { username, password } = req.body;
     if (!username || !password) return res.status(400).json({ error: '用户名和密码不能为空' });
 
+    // Validate username format
+    const usernameResult = validateUsername(username);
+    if (!usernameResult.valid) {
+        return res.status(400).json({ error: usernameResult.errors[0] });
+    }
+
+    // Validate password complexity
+    const passwordResult = validatePassword(password);
+    if (!passwordResult.valid) {
+        return res.status(400).json({ error: passwordResult.errors.join(', ') });
+    }
+
     try {
-        const hashedPassword = await bcrypt.hash(password, 10);
+        const hashedPassword = await bcrypt.hash(password, BCRYPT_SALT_ROUNDS);
 
         // Genesis Admin mechanism
         db.get(`SELECT COUNT(*) as count FROM users`, [], (err, row) => {
@@ -72,7 +88,18 @@ router.post('/register', authLimiter, async (req, res) => {
                     }
                     return res.status(500).json({ error: '注册失败' });
                 }
-                res.json({ message: role === 'admin' ? '注册成功！你已自动成为首位超级管理员' : '注册成功！请登录' });
+
+                // Generate JWT for auto-login after registration
+                const token = jwt.sign(
+                    { id: this.lastID, username, role, token_version: 0 },
+                    JWT_SECRET,
+                    { expiresIn: '1d' }
+                );
+
+                // Set CSRF cookie and return token + csrfToken
+                const csrfToken = generateToken();
+                setCsrfCookie(res, csrfToken);
+                res.json({ token, username, role, csrfToken, message: role === 'admin' ? '注册成功！你已自动成为首位超级管理员' : '注册成功！' });
             });
         });
     } catch (err) {
@@ -99,10 +126,15 @@ router.post('/login', authLimiter, (req, res) => {
                 const token = jwt.sign(
                     { id: user.id, username: user.username, role: userRole, token_version: Number(user.token_version || 0) },
                     JWT_SECRET,
-                    { expiresIn: '1d' }  // Reduced from 7 days to 1 day for security
+                    { expiresIn: '1d' }
                 );
+
+                // Set CSRF cookie and include csrfToken in response body
+                const csrfToken = generateToken();
+                setCsrfCookie(res, csrfToken);
+
                 log(user.id, user.username, 'login', '', getClientIp(req));
-                res.json({ token, username: user.username, role: userRole });
+                res.json({ token, username: user.username, role: userRole, csrfToken });
             } else {
                 res.status(400).json({ error: '用户不存在或密码错误' });
             }
@@ -117,6 +149,12 @@ router.put('/password', authenticateToken, (req, res) => {
     const { oldPassword, newPassword } = req.body;
     if (!oldPassword || !newPassword) return res.status(400).json({ error: '请填写完整信息' });
 
+    // Validate new password complexity
+    const passwordResult = validatePassword(newPassword);
+    if (!passwordResult.valid) {
+        return res.status(400).json({ error: passwordResult.errors.join(', ') });
+    }
+
     db.get(`SELECT * FROM users WHERE id = ?`, [req.user.id], async (err, user) => {
         if (err) return res.status(500).json({ error: '服务器错误' });
         if (!user) return res.status(404).json({ error: '用户不存在' });
@@ -125,7 +163,7 @@ router.put('/password', authenticateToken, (req, res) => {
             const match = await bcrypt.compare(oldPassword, user.password_hash);
             if (!match) return res.status(400).json({ error: '原密码错误' });
 
-            const hashed = await bcrypt.hash(newPassword, 10);
+            const hashed = await bcrypt.hash(newPassword, BCRYPT_SALT_ROUNDS);
             db.run(`UPDATE users SET password_hash = ?, token_version = COALESCE(token_version, 0) + 1 WHERE id = ?`, [hashed, req.user.id], function (updateErr) {
                 if (updateErr) return res.status(500).json({ error: '更新密码失败' });
                 res.json({ message: '密码修改成功，请重新登录' });
@@ -216,6 +254,13 @@ router.delete('/avatar', authenticateToken, (req, res) => {
         if (err) return res.status(500).json({ error: '移除头像失败' });
         res.json({ message: '头像已移除' });
     });
+});
+
+// CSRF Token endpoint — allows frontend to obtain CSRF cookie + token on page load
+router.get('/csrf-token', (req, res) => {
+    const csrfToken = generateToken();
+    setCsrfCookie(res, csrfToken);
+    res.json({ csrfToken });
 });
 
 module.exports = router;

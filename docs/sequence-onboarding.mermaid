@@ -1,0 +1,34 @@
+sequenceDiagram
+    participant User as 用户
+    participant App as app.js入口
+    participant OB as OnboardingFlow
+    participant LS as localStorage
+    participant ES as EmptyStateRenderer
+    participant Api as ApiClient
+    participant Server as Express
+
+    Note over User,Server: 用户首次访问
+    App->>LS: localStorage.getItem('onboarding_completed')
+    LS-->>App: null (未完成)
+    App->>OB: start()
+    OB->>OB: renderStep(1) — "日摊成本是什么？"
+    OB->>User: 显示概念解释modal
+
+    User->>OB: 点击"下一步"
+    OB->>LS: localStorage.setItem('onboarding_step', 2)
+    OB->>OB: renderStep(2) — "添加第一件物品"
+    OB->>User: 显示添加记录表单modal
+
+    User->>OB: 填写物品信息+点击"添加"
+    OB->>Api: POST /api/records {item_name, price, purchase_date}
+    Api->>Server: request with JWT + CSRF
+    Server-->>Api: {id: 123}
+    Api-->>OB: record created
+    OB->>OB: nextStep() → step 3
+
+    OB->>OB: renderStep(3) — "探索统计视图"
+    OB->>User: 显示统计Tab引导
+
+    User->>OB: 点击"完成"
+    OB->>LS: localStorage.setItem('onboarding_completed', 'true')
+    OB->>ES: hide all empty states for this session

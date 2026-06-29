@@ -6,6 +6,7 @@ const https = require('https');
 const fs = require('fs');
 
 const { PORT, HTTPS_PORT, CORS_ORIGIN } = require('./src/config/env');
+const { csrfMiddleware } = require('./src/middlewares/csrf');
 
 const app = express();
 app.set('trust proxy', 1); // 信任反向代理
@@ -15,7 +16,7 @@ app.use(helmet({
     contentSecurityPolicy: {
         directives: {
             defaultSrc: ["'self'"],
-            scriptSrc: ["'self'"],
+            scriptSrc: ["'self'", "'unsafe-inline'"],  // unsafe-inline needed for Swagger UI
             styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
             fontSrc: ["'self'", "https://fonts.gstatic.com"],
             imgSrc: ["'self'", "data:", "https:"],
@@ -24,6 +25,7 @@ app.use(helmet({
             baseUri: ["'self'"],
             frameAncestors: ["'self'"],
             formAction: ["'self'"],
+            upgradeInsecureRequests: null,  // 移除 upgrade-insecure-requests 指令，避免 HTTP 模式下浏览器将资源升级到不可用的 HTTPS
         }
     }
 }));
@@ -32,7 +34,7 @@ app.use(helmet({
 app.use(cors({
     origin: CORS_ORIGIN,
     methods: ['GET', 'POST', 'PUT', 'DELETE'],
-    allowedHeaders: ['Content-Type', 'Authorization']
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-CSRF-Token']
 }));
 app.use(express.json({ limit: '2mb' })); // 支持账本备份与 TOTP 批量导入
 app.use(express.static(path.join(__dirname, 'public')));
@@ -53,6 +55,7 @@ const recordsRoutes = require('./src/routes/records');
 const statsRoutes = require('./src/routes/stats');
 const adminRoutes = require('./src/routes/admin');
 const totpRoutes = require('./src/routes/totp');
+const { registerSwaggerRoutes } = require('./src/routes/swagger');
 const xssClean = require('./src/middlewares/xssClean');
 const { apiLimiter } = require('./src/middlewares/rateLimit');
 
@@ -60,11 +63,18 @@ const { apiLimiter } = require('./src/middlewares/rateLimit');
 app.use('/api', xssClean);
 app.use('/api', apiLimiter);
 
+// CSRF protection — validates mutating requests (POST/PUT/DELETE/PATCH)
+// GET requests are exempt per Double Submit Cookie pattern
+app.use('/api', csrfMiddleware);
+
 app.use('/api/auth', authRoutes);
 app.use('/api/records', recordsRoutes);
 app.use('/api/stats', statsRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/totp', totpRoutes);
+
+// Swagger API documentation (registered after CSRF middleware since /api/docs uses GET)
+registerSwaggerRoutes(app);
 
 // Admin panel route (before catch-all)
 app.get('/admin', (req, res) => {
